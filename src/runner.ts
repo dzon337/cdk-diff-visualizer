@@ -15,10 +15,8 @@ export async function run(options: RunOptions = {}): Promise<void> {
   const config = loadConfig(cwd);
   const dryRun = options.dryRun ?? config.dryRun ?? false;
 
-  // ─── 1. Resolve PR platform env early — fail fast before running cdk diff ───
+  // ─── 1. Resolve prUrl early for HTML report header ───────────────────────────
   let prUrl: string | undefined;
-  let poster: (() => Promise<void>) | null = null;
-
   if (!dryRun) {
     try {
       if (config.platform === 'github') {
@@ -26,7 +24,11 @@ export async function run(options: RunOptions = {}): Promise<void> {
         prUrl = buildGitHubPrUrl(resolveGitHubEnv());
       } else {
         const { resolveBitbucketEnv, buildPrUrl } = await import('./bitbucket');
-        prUrl = buildPrUrl(resolveBitbucketEnv({ workspace: config.workspace, repoSlug: config.repoSlug, apiUrl: config.bitbucketApiUrl }));
+        prUrl = buildPrUrl(resolveBitbucketEnv({
+          workspace: config.workspace,
+          repoSlug: config.repoSlug,
+          apiUrl: config.bitbucketApiUrl,
+        }));
       }
     } catch (err) {
       console.warn(`\n⚠️  cdk-diff-report: ${(err as Error).message}`);
@@ -64,16 +66,14 @@ export async function run(options: RunOptions = {}): Promise<void> {
   }
 
   // ─── 5. Post PR comment ──────────────────────────────────────────────────────
-  // ─── 5. Post PR comment ──────────────────────────────────────────────────────
   if (dryRun) {
     console.log('🔍  Dry run — skipping PR comment. Markdown preview:\n');
     console.log(generateMarkdownComment(diff, prUrl));
     return;
   }
 
-  if (!poster) return;
-
   const markdown = generateMarkdownComment(diff, prUrl);
+
   process.stdout.write('💬  Posting PR comment... ');
   try {
     if (config.platform === 'github') {
@@ -83,7 +83,11 @@ export async function run(options: RunOptions = {}): Promise<void> {
       await postGitHubPrComment(ghEnv, markdown);
     } else {
       const { resolveBitbucketEnv, buildPrUrl, postPrComment } = await import('./bitbucket');
-      const bbEnv = resolveBitbucketEnv({ workspace: config.workspace, repoSlug: config.repoSlug, apiUrl: config.bitbucketApiUrl });
+      const bbEnv = resolveBitbucketEnv({
+        workspace: config.workspace,
+        repoSlug: config.repoSlug,
+        apiUrl: config.bitbucketApiUrl,
+      });
       prUrl = buildPrUrl(bbEnv);
       await postPrComment(bbEnv, markdown);
     }
