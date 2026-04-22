@@ -1,0 +1,8 @@
+src/
+*.map
+tsconfig.json
+.cdkdiffreportrc.example
+*.tar.gz
+.env*
+coverage/
+dist/test/
