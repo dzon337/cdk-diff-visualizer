@@ -1,0 +1,5 @@
+{
+  "cdkArgs": ["--all --ci"],
+  "dryRun": true,
+  "htmlOutput": "cdk-diff.html"
+}

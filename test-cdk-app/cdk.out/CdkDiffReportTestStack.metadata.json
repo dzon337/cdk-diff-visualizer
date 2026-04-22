@@ -1,0 +1,50 @@
+{
+  "/CdkDiffReportTestStack/BootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "BootstrapVersion"
+    }
+  ],
+  "/CdkDiffReportTestStack/CheckBootstrapVersion": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CheckBootstrapVersion"
+    }
+  ],
+  "/CdkDiffReportTestStack/TestBucket/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TestBucket560B80BC"
+    }
+  ],
+  "/CdkDiffReportTestStack/TestQueue/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TestQueue6F0069AA"
+    }
+  ],
+  "/CdkDiffReportTestStack/TestFunction/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TestFunction22AD90FC"
+    }
+  ],
+  "/CdkDiffReportTestStack/CDKMetadata/Default": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "CDKMetadata"
+    }
+  ],
+  "/CdkDiffReportTestStack/TestFunction/ServiceRole/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TestFunctionServiceRole6ABD93C7"
+    }
+  ],
+  "/CdkDiffReportTestStack/TestFunction/ServiceRole/DefaultPolicy/Resource": [
+    {
+      "type": "aws:cdk:logicalId",
+      "data": "TestFunctionServiceRoleDefaultPolicy810BAB0B"
+    }
+  ]
+}

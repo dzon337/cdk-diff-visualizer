@@ -1,0 +1,21 @@
+{
+  "version": "53.0.0",
+  "files": {
+    "9c1cfa4a328e9e375f035648c69afd4ac3fc821ce5a233e1b051758e1ac09f02": {
+      "displayName": "CdkDiffReportTestStack Template",
+      "source": {
+        "path": "CdkDiffReportTestStack.template.json",
+        "packaging": "file"
+      },
+      "destinations": {
+        "248190630812-eu-central-1-731c8daa": {
+          "bucketName": "cdk-hnb659fds-assets-248190630812-eu-central-1",
+          "objectKey": "9c1cfa4a328e9e375f035648c69afd4ac3fc821ce5a233e1b051758e1ac09f02.json",
+          "region": "eu-central-1",
+          "assumeRoleArn": "arn:${AWS::Partition}:iam::248190630812:role/cdk-hnb659fds-file-publishing-role-248190630812-eu-central-1"
+        }
+      }
+    }
+  },
+  "dockerImages": {}
+}

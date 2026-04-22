@@ -31,17 +31,31 @@ const CHANGE_SYMBOLS: Record<string, ChangeType> = {
   '-': 'remove',
 };
 
+// Strip ANSI escape codes emitted by cdk diff (colors, bold, cursor moves)
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+}
+
 export function parseCdkDiff(raw: string): ParsedDiff {
-  const lines = raw.split('\n');
-  const stacks: StackDiff[] = [];
+  const cleaned = stripAnsi(raw);
+  console.log("STARTED PARSING")
+  // DEBUG: log every line that contains a bracket change marker
+  cleaned.split('\n').forEach((line, i) => {
+    if (/^\[.?\]/.test(line.trim())) {
+      console.error(`[DEBUG line ${i}]: ${JSON.stringify(line.trim())}`);
+    }
+  });
+  const lines = cleaned.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n'); const stacks: StackDiff[] = [];
 
   let current: StackDiff | null = null;
   let inResources = false;
-  let inIam = false;
 
   for (const line of lines) {
-    // New stack
-    const stackMatch = line.match(/^Stack\s+(.+)$/);
+    const trimmed = line.trim();
+
+    // New stack block
+    const stackMatch = trimmed.match(/^Stack\s+(.+)$/);
     if (stackMatch) {
       current = {
         stackName: stackMatch[1].trim(),
@@ -52,42 +66,46 @@ export function parseCdkDiff(raw: string): ParsedDiff {
       };
       stacks.push(current);
       inResources = false;
-      inIam = false;
       continue;
     }
 
     if (!current) continue;
 
-    if (/There were no differences/.test(line)) {
+    if (/There were no differences/.test(trimmed)) {
       current.noChanges = true;
       continue;
     }
 
-    if (/IAM Statement Changes/i.test(line)) {
+    // IAM / Security section headers — flag the stack but stop resource parsing
+    if (/IAM Statement Changes|IAM Policy Changes/i.test(trimmed)) {
       current.hasIamChanges = true;
-      inIam = true;
-      continue;
-    }
-
-    if (/Security Group Changes/i.test(line)) {
-      current.hasSecurityGroupChanges = true;
-      continue;
-    }
-
-    if (/^Resources$/i.test(line.trim())) {
-      inResources = true;
-      inIam = false;
-      continue;
-    }
-
-    if (/^Other Changes$/i.test(line.trim())) {
       inResources = false;
       continue;
     }
 
-    // Resource line: [+] AWS::S3::Bucket MyBucket MyBucketABC123
-    const resMatch = line.match(/^\[([+~!\-])\]\s+(\S+)\s+(.+)$/);
-    if (resMatch && inResources) {
+    if (/Security Group Changes/i.test(trimmed)) {
+      current.hasSecurityGroupChanges = true;
+      inResources = false;
+      continue;
+    }
+
+    // Resources section — start parsing
+    if (/^Resources$/i.test(trimmed)) {
+      inResources = true;
+      continue;
+    }
+
+    // Any other top-level section — stop parsing resources
+    if (/^(Parameters|Outputs|Other Changes|Conditions)$/i.test(trimmed)) {
+      inResources = false;
+      continue;
+    }
+
+    if (!inResources) continue;
+
+    // Resource line: [+] AWS::S3::Bucket LogicalId PhysicalId
+    const resMatch = trimmed.match(/^\[([+~!\-])\]\s+(\S+)\s+(.+)$/);
+    if (resMatch) {
       const sym = resMatch[1];
       const changeType = CHANGE_SYMBOLS[sym] ?? 'modify';
       const awsType = resMatch[2];
@@ -100,7 +118,7 @@ export function parseCdkDiff(raw: string): ParsedDiff {
         awsType,
         logicalId,
         physicalId,
-        raw: line.trim(),
+        raw: trimmed,
       });
     }
   }
