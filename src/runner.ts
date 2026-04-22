@@ -74,23 +74,24 @@ export async function run(options: RunOptions = {}): Promise<void> {
   if (!poster) return;
 
   const markdown = generateMarkdownComment(diff, prUrl);
-
   process.stdout.write('💬  Posting PR comment... ');
-
-  if (config.platform === 'github') {
-    const { resolveGitHubEnv, buildGitHubPrUrl, postGitHubPrComment } = await import('./github');
-    const ghEnv = resolveGitHubEnv();
-    prUrl = buildGitHubPrUrl(ghEnv);
-    await postGitHubPrComment(ghEnv, markdown);
-  } else {
-    const { resolveBitbucketEnv, buildPrUrl, postPrComment } = await import('./bitbucket');
-    const bbEnv = resolveBitbucketEnv({ workspace: config.workspace, repoSlug: config.repoSlug, apiUrl: config.bitbucketApiUrl });
-    prUrl = buildPrUrl(bbEnv);
-    await postPrComment(bbEnv, markdown);
+  try {
+    if (config.platform === 'github') {
+      const { resolveGitHubEnv, buildGitHubPrUrl, postGitHubPrComment } = await import('./github');
+      const ghEnv = resolveGitHubEnv();
+      prUrl = buildGitHubPrUrl(ghEnv);
+      await postGitHubPrComment(ghEnv, markdown);
+    } else {
+      const { resolveBitbucketEnv, buildPrUrl, postPrComment } = await import('./bitbucket');
+      const bbEnv = resolveBitbucketEnv({ workspace: config.workspace, repoSlug: config.repoSlug, apiUrl: config.bitbucketApiUrl });
+      prUrl = buildPrUrl(bbEnv);
+      await postPrComment(bbEnv, markdown);
+    }
+    console.log('done ✓');
+    console.log(`🔗  ${prUrl}\n`);
+  } catch (err) {
+    console.error(`\n❌  Failed to post PR comment: ${(err as Error).message}`);
   }
-
-  console.log('done ✓');
-  console.log(`🔗  ${prUrl}\n`);
 }
 
 function runCdkDiff(args: string[], cwd: string): Promise<string> {

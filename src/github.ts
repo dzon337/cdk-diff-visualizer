@@ -7,6 +7,11 @@ export interface GitHubEnv {
 }
 
 export function resolveGitHubEnv(): GitHubEnv {
+    console.log('[github] GITHUB_REF:', process.env['GITHUB_REF']);
+    console.log('[github] GITHUB_REPOSITORY:', process.env['GITHUB_REPOSITORY']);
+    console.log('[github] GITHUB_REPOSITORY_OWNER:', process.env['GITHUB_REPOSITORY_OWNER']);
+    console.log('[github] GITHUB_TOKEN set:', !!process.env['GITHUB_TOKEN']);
+    console.log('[github] GITHUB_PR_NUMBER:', process.env['GITHUB_PR_NUMBER']);
     const prNumber = process.env['GITHUB_PR_NUMBER']
         ?? extractPrFromRef(process.env['GITHUB_REF'] ?? '');
     const owner = process.env['GITHUB_REPOSITORY_OWNER'] ?? '';
