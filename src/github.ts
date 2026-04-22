@@ -12,8 +12,10 @@ export function resolveGitHubEnv(): GitHubEnv {
     console.log('[github] GITHUB_REPOSITORY_OWNER:', process.env['GITHUB_REPOSITORY_OWNER']);
     console.log('[github] GITHUB_TOKEN set:', !!process.env['GITHUB_TOKEN']);
     console.log('[github] GITHUB_PR_NUMBER:', process.env['GITHUB_PR_NUMBER']);
-    const prNumber = process.env['GITHUB_PR_NUMBER']
-        ?? extractPrFromRef(process.env['GITHUB_REF'] ?? '');
+    const prNumber = extractPrFromRef(process.env['GITHUB_REF'] ?? '')
+        || process.env['GITHUB_PR_NUMBER']
+        || '';
+
     const owner = process.env['GITHUB_REPOSITORY_OWNER'] ?? '';
     const fullRepo = process.env['GITHUB_REPOSITORY'] ?? '';
     const repo = fullRepo.split('/')[1] ?? '';
@@ -32,6 +34,8 @@ export function resolveGitHubEnv(): GitHubEnv {
             `These are set automatically by GitHub Actions.`
         );
     }
+
+    console.log('[github] resolved prNumber:', prNumber);
 
     return { prNumber, owner, repo, token, apiUrl };
 }
