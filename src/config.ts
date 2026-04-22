@@ -2,22 +2,18 @@ import fs from 'fs';
 import path from 'path';
 
 export interface Config {
-  /** Args forwarded verbatim to `cdk diff`, e.g. ["--all", "--context", "env=prod"] */
   cdkArgs: string[];
-  /** Bitbucket workspace slug. Defaults to BITBUCKET_WORKSPACE env var. */
+  platform?: 'bitbucket' | 'github';
   workspace?: string;
-  /** Bitbucket repo slug. Defaults to BITBUCKET_REPO_SLUG env var. */
   repoSlug?: string;
-  /** Bitbucket API base URL. Defaults to https://api.bitbucket.org/2.0 */
   bitbucketApiUrl?: string;
-  /** If true, skip posting the PR comment (useful for local runs) */
   dryRun?: boolean;
-  /** Output HTML report to this file path in addition to posting the comment */
   htmlOutput?: string;
 }
 
 const DEFAULTS: Config = {
-  cdkArgs: ['--all'],
+  cdkArgs: ['--all', '--ci'],
+  platform: 'bitbucket',
   bitbucketApiUrl: 'https://api.bitbucket.org/2.0',
   dryRun: false,
 };
