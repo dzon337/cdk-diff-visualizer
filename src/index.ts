@@ -5,6 +5,13 @@ export { generateHtml, generateMarkdownComment } from './report';
 export { loadConfig } from './config';
 export type { Config } from './config';
 export {
+  estimateResourceCost,
+  calculateCostImpact,
+  formatCost,
+  formatCostWithSign,
+} from './cost-estimator';
+export type { CostEstimate, CostImpact } from './cost-estimator';
+export {
   resolveBitbucketEnv,
   buildPrUrl,
   postPrComment,

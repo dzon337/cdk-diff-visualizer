@@ -1,3 +1,5 @@
+import { estimateResourceCost, calculateCostImpact, CostEstimate, CostImpact } from './cost-estimator';
+
 export type ChangeType = 'add' | 'modify' | 'remove';
 
 export interface ResourceChange {
@@ -6,6 +8,8 @@ export interface ResourceChange {
   logicalId: string;
   physicalId?: string;
   raw: string;
+  /** Estimated monthly cost for this resource type (null if unknown) */
+  estimatedCost: CostEstimate | null;
 }
 
 export interface StackDiff {
@@ -14,6 +18,8 @@ export interface StackDiff {
   hasIamChanges: boolean;
   hasSecurityGroupChanges: boolean;
   noChanges: boolean;
+  /** Aggregate cost impact of changes in this stack */
+  costImpact: CostImpact;
 }
 
 export interface ParsedDiff {
@@ -22,6 +28,8 @@ export interface ParsedDiff {
   totalModified: number;
   totalRemoved: number;
   hasSecurityChanges: boolean;
+  /** Aggregate cost impact across all stacks */
+  costImpact: CostImpact;
 }
 
 const CHANGE_SYMBOLS: Record<string, ChangeType> = {
@@ -63,6 +71,7 @@ export function parseCdkDiff(raw: string): ParsedDiff {
         hasIamChanges: false,
         hasSecurityGroupChanges: false,
         noChanges: false,
+        costImpact: { addedCost: 0, removedCost: 0, netCost: 0, knownResources: 0, unknownResources: 0 },
       };
       stacks.push(current);
       inResources = false;
@@ -119,11 +128,18 @@ export function parseCdkDiff(raw: string): ParsedDiff {
         logicalId,
         physicalId,
         raw: trimmed,
+        estimatedCost: estimateResourceCost(awsType),
       });
     }
   }
 
+  // Calculate per-stack cost impact
+  for (const stack of stacks) {
+    stack.costImpact = calculateCostImpact(stack.resources);
+  }
+
   const allResources = stacks.flatMap((s) => s.resources);
+  const totalCostImpact = calculateCostImpact(allResources);
 
   return {
     stacks,
@@ -131,5 +147,6 @@ export function parseCdkDiff(raw: string): ParsedDiff {
     totalModified: allResources.filter((r) => r.changeType === 'modify').length,
     totalRemoved: allResources.filter((r) => r.changeType === 'remove').length,
     hasSecurityChanges: stacks.some((s) => s.hasIamChanges || s.hasSecurityGroupChanges),
+    costImpact: totalCostImpact,
   };
 }

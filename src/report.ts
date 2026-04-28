@@ -1,4 +1,5 @@
 import { ParsedDiff, StackDiff, ResourceChange } from './parser';
+import { formatCost, formatCostWithSign } from './cost-estimator';
 
 const CHANGE_EMOJI: Record<string, string> = {
   add: '✅',
@@ -16,11 +17,24 @@ function renderResourceRow(r: ResourceChange): string {
   const emoji = CHANGE_EMOJI[r.changeType];
   const label = CHANGE_LABEL[r.changeType];
   const shortType = r.awsType.replace('AWS::', '').replace('::', ' › ');
+
+  let costCell = '<td class="cost-cell">—</td>';
+  if (r.estimatedCost) {
+    if (r.estimatedCost.monthlyCost === 0) {
+      costCell = '<td class="cost-cell cost-free">Free</td>';
+    } else {
+      const sign = r.changeType === 'remove' ? '-' : r.changeType === 'add' ? '+' : '~';
+      const cssClass = r.changeType === 'remove' ? 'cost-saving' : 'cost-increase';
+      costCell = `<td class="cost-cell ${cssClass}">${sign}${formatCost(r.estimatedCost.monthlyCost)}/mo</td>`;
+    }
+  }
+
   return `
     <tr class="change-row change-${r.changeType}">
       <td class="change-type">${emoji} ${label}</td>
       <td class="logical-id"><code>${r.logicalId}</code></td>
       <td class="aws-type">${shortType}</td>
+      ${costCell}
       ${r.physicalId ? `<td class="physical-id"><code class="physical">${r.physicalId.substring(0, 60)}${r.physicalId.length > 60 ? '…' : ''}</code></td>` : '<td></td>'}
     </tr>`;
 }
@@ -30,12 +44,17 @@ function renderStack(stack: StackDiff): string {
   const modified = stack.resources.filter((r) => r.changeType === 'modify').length;
   const removed = stack.resources.filter((r) => r.changeType === 'remove').length;
 
+  const costBadge = stack.costImpact.netCost !== 0
+    ? `<span class="badge ${stack.costImpact.netCost > 0 ? 'badge-cost-up' : 'badge-cost-down'}">${formatCostWithSign(stack.costImpact.netCost)}/mo</span>`
+    : '';
+
   const badges = [
     added ? `<span class="badge badge-add">+${added} added</span>` : '',
     modified ? `<span class="badge badge-modify">~${modified} modified</span>` : '',
     removed ? `<span class="badge badge-remove">-${removed} removed</span>` : '',
     stack.hasIamChanges ? `<span class="badge badge-iam">🔐 IAM</span>` : '',
     stack.hasSecurityGroupChanges ? `<span class="badge badge-iam">🛡 SG</span>` : '',
+    costBadge,
   ]
     .filter(Boolean)
     .join(' ');
@@ -53,7 +72,7 @@ function renderStack(stack: StackDiff): string {
   const iamWarning =
     stack.hasIamChanges || stack.hasSecurityGroupChanges
       ? `<tr class="iam-warning-row">
-          <td colspan="4">🔐 This stack contains IAM / Security Group changes — review carefully before merging.</td>
+          <td colspan="5">🔐 This stack contains IAM / Security Group changes — review carefully before merging.</td>
         </tr>`
       : '';
 
@@ -69,6 +88,7 @@ function renderStack(stack: StackDiff): string {
             <th>Change</th>
             <th>Logical ID</th>
             <th>Type</th>
+            <th>Est. Cost</th>
             <th>Physical ID</th>
           </tr>
         </thead>
@@ -87,6 +107,13 @@ export function generateHtml(diff: ParsedDiff, prUrl?: string, rawDiff?: string)
 
   const securityBanner = diff.hasSecurityChanges
     ? `<div class="security-banner">⚠️ Security-sensitive changes detected (IAM / Security Groups). Review before merging.</div>`
+    : '';
+
+  const costBanner = diff.costImpact.netCost !== 0
+    ? `<div class="cost-banner ${diff.costImpact.netCost > 0 ? 'cost-banner-up' : 'cost-banner-down'}">
+        💰 Estimated monthly cost impact: <strong>${formatCostWithSign(diff.costImpact.netCost)}/mo</strong>
+        ${diff.costImpact.unknownResources > 0 ? `<span class="cost-note">(${diff.costImpact.unknownResources} resource(s) with unknown costs)</span>` : ''}
+      </div>`
     : '';
 
   const rawSection = rawDiff
@@ -111,7 +138,7 @@ export function generateHtml(diff: ParsedDiff, prUrl?: string, rawDiff?: string)
     .report-meta { font-size: 13px; color: #666; margin-top: 4px; }
     .pr-link { display: inline-block; background: #0052cc; color: #fff; text-decoration: none; padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 500; }
     .pr-link:hover { background: #0043a6; }
-    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+    .summary-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 1.5rem; }
     .stat-card { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; padding: 1rem 1.25rem; }
     .stat-num { font-size: 28px; font-weight: 600; line-height: 1; }
     .stat-label { font-size: 12px; color: #666; margin-top: 4px; }
@@ -119,7 +146,14 @@ export function generateHtml(diff: ParsedDiff, prUrl?: string, rawDiff?: string)
     .stat-modify .stat-num { color: #9a6700; }
     .stat-remove .stat-num { color: #cf222e; }
     .stat-security .stat-num { color: #0550ae; }
+    .stat-cost .stat-num { color: #6e4f00; }
+    .stat-cost-up .stat-num { color: #cf222e; }
+    .stat-cost-down .stat-num { color: #1a7f37; }
     .security-banner { background: #fff8c5; border: 1px solid #d4a72c; border-radius: 8px; padding: 12px 16px; margin-bottom: 1.5rem; font-size: 13px; color: #6e4f00; font-weight: 500; }
+    .cost-banner { border-radius: 8px; padding: 12px 16px; margin-bottom: 1.5rem; font-size: 13px; font-weight: 500; }
+    .cost-banner-up { background: #ffebe9; border: 1px solid #cf222e; color: #82071e; }
+    .cost-banner-down { background: #dafbe1; border: 1px solid #1a7f37; color: #0d5623; }
+    .cost-note { font-weight: 400; font-size: 12px; margin-left: 8px; opacity: 0.8; }
     .stack-block { background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; margin-bottom: 1rem; overflow: hidden; }
     .stack-header { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #e0e0e0; background: #fafafa; flex-wrap: wrap; }
     .stack-name { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 14px; font-weight: 600; }
@@ -130,6 +164,8 @@ export function generateHtml(diff: ParsedDiff, prUrl?: string, rawDiff?: string)
     .badge-remove { background: #ffebe9; color: #cf222e; }
     .badge-iam { background: #ddf4ff; color: #0550ae; }
     .badge-nochange { background: #f0f0f0; color: #666; }
+    .badge-cost-up { background: #ffebe9; color: #cf222e; }
+    .badge-cost-down { background: #dafbe1; color: #1a7f37; }
     .resource-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .resource-table thead th { text-align: left; padding: 8px 16px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #666; font-weight: 600; border-bottom: 1px solid #e0e0e0; background: #fafafa; }
     .resource-table tbody tr { border-bottom: 1px solid #f0f0f0; }
@@ -142,12 +178,16 @@ export function generateHtml(diff: ParsedDiff, prUrl?: string, rawDiff?: string)
     .logical-id code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; background: #f5f5f5; padding: 2px 6px; border-radius: 4px; }
     .aws-type { color: #444; }
     .physical { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; color: #888; }
+    .cost-cell { font-size: 12px; font-weight: 600; font-family: 'SF Mono', 'Fira Code', monospace; white-space: nowrap; }
+    .cost-free { color: #1a7f37; }
+    .cost-increase { color: #cf222e; }
+    .cost-saving { color: #1a7f37; }
     .iam-warning-row td { background: #fff8c5; color: #6e4f00; font-size: 12px; font-weight: 500; padding: 8px 16px; border-left: 3px solid #d4a72c; }
     .raw-details { margin-top: 1.5rem; background: #fff; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; }
     .raw-details summary { padding: 12px 16px; cursor: pointer; font-size: 13px; font-weight: 500; color: #444; background: #fafafa; border-bottom: 1px solid #e0e0e0; }
     .raw-diff { padding: 1rem 1.25rem; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; line-height: 1.6; overflow-x: auto; white-space: pre; color: #333; }
     .footer { margin-top: 1.5rem; font-size: 12px; color: #999; text-align: center; }
-    @media (max-width: 600px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 700px) { .summary-grid { grid-template-columns: repeat(2, 1fr); } }
   </style>
 </head>
 <body>
@@ -165,13 +205,15 @@ export function generateHtml(diff: ParsedDiff, prUrl?: string, rawDiff?: string)
       <div class="stat-card stat-modify"><div class="stat-num">${diff.totalModified}</div><div class="stat-label">Resources modified</div></div>
       <div class="stat-card stat-remove"><div class="stat-num">${diff.totalRemoved}</div><div class="stat-label">Resources removed</div></div>
       <div class="stat-card stat-security"><div class="stat-num">${diff.stacks.filter((s) => s.hasIamChanges || s.hasSecurityGroupChanges).length}</div><div class="stat-label">Stacks with IAM changes</div></div>
+      <div class="stat-card ${diff.costImpact.netCost > 0 ? 'stat-cost-up' : diff.costImpact.netCost < 0 ? 'stat-cost-down' : 'stat-cost'}"><div class="stat-num">${formatCostWithSign(diff.costImpact.netCost)}</div><div class="stat-label">Est. monthly impact</div></div>
     </div>
 
     ${securityBanner}
+    ${costBanner}
     ${diff.stacks.map(renderStack).join('')}
     ${rawSection}
 
-    <div class="footer">Generated by cdk-diff-report</div>
+    <div class="footer">Generated by cdk-diff-report · Cost estimates are approximate (us-east-1 defaults)</div>
   </div>
 </body>
 </html>`;
@@ -188,11 +230,20 @@ export function generateMarkdownComment(diff: ParsedDiff, prUrl?: string, htmlRe
     lines.push('');
   }
 
+  if (diff.costImpact.netCost !== 0) {
+    const emoji = diff.costImpact.netCost > 0 ? '📈' : '📉';
+    const unknownNote = diff.costImpact.unknownResources > 0
+      ? ` _(${diff.costImpact.unknownResources} resource(s) with unknown costs)_`
+      : '';
+    lines.push(`> ${emoji} **Estimated monthly cost impact: ${formatCostWithSign(diff.costImpact.netCost)}/mo**${unknownNote}`);
+    lines.push('');
+  }
+
   // Summary table
-  lines.push('| ✅ Added | ⚠️ Modified | ❌ Removed | 🔐 IAM stacks |');
-  lines.push('|---------|------------|-----------|--------------|');
+  lines.push('| ✅ Added | ⚠️ Modified | ❌ Removed | 🔐 IAM stacks | 💰 Est. cost |');
+  lines.push('|---------|------------|-----------|--------------|-------------|');
   const iamCount = diff.stacks.filter((s) => s.hasIamChanges || s.hasSecurityGroupChanges).length;
-  lines.push(`| ${diff.totalAdded} | ${diff.totalModified} | ${diff.totalRemoved} | ${iamCount} |`);
+  lines.push(`| ${diff.totalAdded} | ${diff.totalModified} | ${diff.totalRemoved} | ${iamCount} | ${formatCostWithSign(diff.costImpact.netCost)}/mo |`);
   lines.push('');
 
   // Per-stack breakdown
@@ -201,11 +252,16 @@ export function generateMarkdownComment(diff: ParsedDiff, prUrl?: string, htmlRe
     const modified = stack.resources.filter((r) => r.changeType === 'modify').length;
     const removed = stack.resources.filter((r) => r.changeType === 'remove').length;
 
+    const costStr = stack.costImpact.netCost !== 0
+      ? `💰 ${formatCostWithSign(stack.costImpact.netCost)}/mo`
+      : '';
+
     const badges = [
       added ? `+${added}` : '',
       modified ? `~${modified}` : '',
       removed ? `-${removed}` : '',
       stack.hasIamChanges ? '🔐 IAM' : '',
+      costStr,
     ]
       .filter(Boolean)
       .join(' · ');
@@ -221,13 +277,22 @@ export function generateMarkdownComment(diff: ParsedDiff, prUrl?: string, htmlRe
         lines.push('> 🔐 IAM / Security Group changes — check the full diff before approving.');
         lines.push('');
       }
-      lines.push('| Change | Logical ID | Type |');
-      lines.push('|--------|-----------|------|');
+      lines.push('| Change | Logical ID | Type | Est. Cost |');
+      lines.push('|--------|-----------|------|-----------|');
       for (const r of stack.resources) {
         const emoji = CHANGE_EMOJI[r.changeType];
         const label = CHANGE_LABEL[r.changeType];
         const shortType = r.awsType.replace('AWS::', '').replace('::', ' › ');
-        lines.push(`| ${emoji} ${label} | \`${r.logicalId}\` | ${shortType} |`);
+        let costStr = '—';
+        if (r.estimatedCost) {
+          if (r.estimatedCost.monthlyCost === 0) {
+            costStr = 'Free';
+          } else {
+            const sign = r.changeType === 'remove' ? '-' : r.changeType === 'add' ? '+' : '~';
+            costStr = `${sign}${formatCost(r.estimatedCost.monthlyCost)}/mo`;
+          }
+        }
+        lines.push(`| ${emoji} ${label} | \`${r.logicalId}\` | ${shortType} | ${costStr} |`);
       }
     }
 
@@ -247,7 +312,7 @@ export function generateMarkdownComment(diff: ParsedDiff, prUrl?: string, htmlRe
   }
 
   lines.push('---');
-  lines.push('*Generated by [cdk-diff-report](https://www.npmjs.com/package/cdk-diff-report)*');
+  lines.push('*Generated by [cdk-diff-report](https://www.npmjs.com/package/cdk-diff-report) · Cost estimates are approximate (us-east-1 defaults)*');
 
   return lines.join('\n');
 }

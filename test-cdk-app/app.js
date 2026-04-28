@@ -9,7 +9,7 @@ const stack = new cdk.Stack(app, 'CdkDiffReportTestStack', {
   // Pull account/region from your local AWS profile
   env: {
     account: process.env.CDK_DEFAULT_ACCOUNT,
-    region:  process.env.CDK_DEFAULT_REGION,
+    region: process.env.CDK_DEFAULT_REGION,
   },
 });
 

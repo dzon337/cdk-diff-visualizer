@@ -4,6 +4,7 @@ import path from 'path';
 import { loadConfig } from './config';
 import { parseCdkDiff } from './parser';
 import { generateHtml, generateMarkdownComment } from './report';
+import { formatCostWithSign } from './cost-estimator';
 
 export interface RunOptions {
   dryRun?: boolean;
@@ -53,6 +54,10 @@ export async function run(options: RunOptions = {}): Promise<void> {
     console.log('\n✅  No infrastructure changes detected.\n');
   } else {
     console.log(`\n📊  Summary: +${diff.totalAdded} added, ~${diff.totalModified} modified, -${diff.totalRemoved} removed`);
+    if (diff.costImpact.netCost !== 0) {
+      const emoji = diff.costImpact.netCost > 0 ? '📈' : '📉';
+      console.log(`${emoji}  Estimated cost impact: ${formatCostWithSign(diff.costImpact.netCost)}/mo`);
+    }
     if (diff.hasSecurityChanges) {
       console.log('🔐  IAM / Security Group changes detected — review carefully!');
     }
