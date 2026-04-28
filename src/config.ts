@@ -3,10 +3,11 @@ import path from 'path';
 
 export interface Config {
   cdkArgs: string[];
-  platform?: 'bitbucket' | 'github';
+  platform?: 'bitbucket' | 'github' | 'gitlab';
   workspace?: string;
   repoSlug?: string;
   bitbucketApiUrl?: string;
+  gitlabApiUrl?: string;
   dryRun?: boolean;
   htmlOutput?: string;
 }

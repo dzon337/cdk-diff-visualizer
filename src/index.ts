@@ -23,3 +23,13 @@ export {
   listPrComments as listGitHubPrComments,
 } from './github';
 export type { GitHubEnv } from './github';
+export {
+  resolveGitLabEnv,
+  buildGitLabMrUrl,
+  postMrNote,
+  updateMrNote,
+  deleteMrNote,
+  upsertMrNote,
+  listMrNotes,
+} from './gitlab';
+export type { GitLabEnv } from './gitlab';

@@ -1,6 +1,6 @@
 # cdk-diff-report
 
-Run `cdk diff`, stream the output live to your pipeline console, and automatically post a formatted summary comment to your **Bitbucket** or **GitHub** pull request.
+Run `cdk diff`, stream the output live to your pipeline console, and automatically post a formatted summary comment to your **Bitbucket**, **GitHub**, or **GitLab** pull/merge request.
 
 On repeated pipeline runs the **existing comment is updated in-place** (upsert) instead of creating duplicates.
 
@@ -22,9 +22,9 @@ That's it. The tool:
 1. Reads your `.cdkdiffreportrc` config
 2. Runs `cdk diff` with your configured args
 3. Streams raw output to the console (visible in pipeline logs)
-4. Parses the diff and posts a formatted Markdown summary as a PR comment
+4. Parses the diff and posts a formatted Markdown summary as a PR/MR comment
 5. On subsequent runs, **updates** the existing comment instead of creating a new one
-6. Prints the PR link to the console
+6. Prints the PR/MR link to the console
 
 ```bash
 cdk-diff-report --dry-run   # runs diff, prints markdown preview, skips posting
@@ -46,13 +46,14 @@ Create a `.cdkdiffreportrc` file in your project root:
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `platform` | `string` | `"bitbucket"` | CI platform: `"bitbucket"` or `"github"` |
+| `platform` | `string` | `"bitbucket"` | CI platform: `"bitbucket"`, `"github"`, or `"gitlab"` |
 | `cdkArgs` | `string[]` | `["--all"]` | Args forwarded verbatim to `cdk diff` |
 | `htmlOutput` | `string` | — | Write a standalone HTML report to this path |
 | `dryRun` | `boolean` | `false` | Skip posting, print markdown preview instead |
 | `bitbucketApiUrl` | `string` | `https://api.bitbucket.org/2.0` | Override for Bitbucket Server |
-| `workspace` | `string` | `$BITBUCKET_WORKSPACE` | Override workspace slug |
-| `repoSlug` | `string` | `$BITBUCKET_REPO_SLUG` | Override repo slug |
+| `gitlabApiUrl` | `string` | `$CI_API_V4_URL` or `https://gitlab.com/api/v4` | Override for self-managed GitLab |
+| `workspace` | `string` | `$BITBUCKET_WORKSPACE` | Override workspace slug (Bitbucket) |
+| `repoSlug` | `string` | `$BITBUCKET_REPO_SLUG` | Override repo slug (Bitbucket) |
 
 ## Bitbucket
 
@@ -127,6 +128,50 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
+## GitLab
+
+### Environment Variables
+
+These are set automatically by GitLab CI/CD when using **merge request pipelines**:
+
+| Variable | Description |
+|----------|-------------|
+| `CI_PROJECT_ID` | Numeric project ID |
+| `CI_MERGE_REQUEST_IID` | Merge request IID (only set for MR pipelines) |
+| `GITLAB_TOKEN` | **You must create this.** Project or personal access token with `api` scope. |
+| `CI_JOB_TOKEN` | Fallback — auto-provided, but has limited permissions. Prefer `GITLAB_TOKEN`. |
+| `CI_API_V4_URL` | Auto-set to `https://gitlab.com/api/v4` (or your self-managed instance URL) |
+
+> **Important:** `CI_MERGE_REQUEST_IID` is only available in [merge request pipelines](https://docs.gitlab.com/ee/ci/pipelines/merge_request_pipelines.html). Make sure your `.gitlab-ci.yml` uses `rules` or `only: - merge_requests`.
+
+### GitLab CI/CD setup
+
+```yaml
+# .gitlab-ci.yml
+cdk-diff:
+  image: node:20
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - npm ci
+    - npx cdk-diff-report
+  variables:
+    GITLAB_TOKEN: $CDK_DIFF_GITLAB_TOKEN   # set in CI/CD Settings → Variables
+```
+
+Add `CDK_DIFF_GITLAB_TOKEN` as a **CI/CD variable** in GitLab → Settings → CI/CD → Variables (masked, protected recommended).
+
+#### Self-managed GitLab
+
+For self-managed instances, `CI_API_V4_URL` is automatically set to the correct API URL. Alternatively, override it in `.cdkdiffreportrc`:
+
+```json
+{
+  "platform": "gitlab",
+  "gitlabApiUrl": "https://gitlab.mycompany.com/api/v4"
+}
+```
+
 ## AWS CodePipeline / CodeBuild
 
 ```yaml
@@ -138,9 +183,9 @@ phases:
       - npx cdk-diff-report
 ```
 
-Set `BITBUCKET_ACCESS_TOKEN` (or `GITHUB_TOKEN`) as a CodeBuild environment variable (from Secrets Manager recommended).
+Set the appropriate token (`BITBUCKET_ACCESS_TOKEN`, `GITHUB_TOKEN`, or `GITLAB_TOKEN`) as a CodeBuild environment variable (from Secrets Manager recommended).
 
-## PR Comment example
+## PR/MR Comment example
 
 The tool posts a collapsible Markdown comment per stack:
 
@@ -205,4 +250,26 @@ import {
 
 const env = resolveGitHubEnv();
 await upsertGitHubPrComment(env, '## My Report\n...');
+```
+
+### GitLab comment management
+
+```typescript
+import {
+  resolveGitLabEnv,
+  upsertMrNote,
+  listMrNotes,
+  deleteMrNote,
+} from 'cdk-diff-report';
+
+const env = resolveGitLabEnv();
+
+// Upsert — creates or updates the cdk-diff-report MR note
+await upsertMrNote(env, '## My Report\n...');
+
+// List all MR notes
+const notes = await listMrNotes(env);
+
+// Delete a specific note
+await deleteMrNote(env, noteId);
 ```

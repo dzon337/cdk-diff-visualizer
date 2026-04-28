@@ -22,6 +22,9 @@ export async function run(options: RunOptions = {}): Promise<void> {
       if (config.platform === 'github') {
         const { resolveGitHubEnv, buildGitHubPrUrl } = await import('./github');
         prUrl = buildGitHubPrUrl(resolveGitHubEnv());
+      } else if (config.platform === 'gitlab') {
+        const { resolveGitLabEnv, buildGitLabMrUrl } = await import('./gitlab');
+        prUrl = buildGitLabMrUrl(resolveGitLabEnv({ apiUrl: config.gitlabApiUrl }));
       } else {
         const { resolveBitbucketEnv, buildPrUrl } = await import('./bitbucket');
         prUrl = buildPrUrl(resolveBitbucketEnv({
@@ -81,6 +84,11 @@ export async function run(options: RunOptions = {}): Promise<void> {
       const ghEnv = resolveGitHubEnv();
       prUrl = buildGitHubPrUrl(ghEnv);
       await upsertGitHubPrComment(ghEnv, markdown);
+    } else if (config.platform === 'gitlab') {
+      const { resolveGitLabEnv, buildGitLabMrUrl, upsertMrNote } = await import('./gitlab');
+      const glEnv = resolveGitLabEnv({ apiUrl: config.gitlabApiUrl });
+      prUrl = buildGitLabMrUrl(glEnv);
+      await upsertMrNote(glEnv, markdown);
     } else {
       const { resolveBitbucketEnv, buildPrUrl, upsertPrComment } = await import('./bitbucket');
       const bbEnv = resolveBitbucketEnv({

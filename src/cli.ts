@@ -11,7 +11,7 @@ cdk-diff-report
 Runs \`cdk diff\` (using args from .cdkdiffreportrc), streams output to the
 console, then posts a formatted summary comment to your pull request.
 
-Supports both Bitbucket and GitHub. On repeated runs the existing comment is
+Supports Bitbucket, GitHub, and GitLab. On repeated runs the existing comment is
 updated in-place (upsert) instead of creating duplicates.
 
 Usage:
@@ -21,7 +21,7 @@ Usage:
 
 Configuration (.cdkdiffreportrc in project root):
   {
-    "platform": "bitbucket",        // "bitbucket" (default) or "github"
+    "platform": "bitbucket",        // "bitbucket" (default), "github", or "gitlab"
     "cdkArgs": ["--all"],           // args forwarded to cdk diff
     "htmlOutput": "cdk-diff.html",  // optional: write HTML report to file
     "dryRun": false                 // optional: never post, just preview
@@ -38,6 +38,12 @@ GitHub env vars (set automatically by GitHub Actions):
   GITHUB_REPOSITORY
   GITHUB_REPOSITORY_OWNER
   GITHUB_TOKEN
+
+GitLab env vars (set automatically by GitLab CI merge request pipelines):
+  CI_PROJECT_ID
+  CI_MERGE_REQUEST_IID
+  GITLAB_TOKEN                    // or CI_JOB_TOKEN (needs api scope)
+  CI_API_V4_URL                   // auto-set, defaults to https://gitlab.com/api/v4
 `);
   process.exit(0);
 }
