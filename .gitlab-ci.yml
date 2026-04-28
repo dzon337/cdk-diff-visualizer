@@ -1,0 +1,49 @@
+stages:
+  - diff
+
+cdk-diff:
+  stage: diff
+  image: node:20
+
+  # Only run on merge request pipelines (required for CI_MERGE_REQUEST_IID)
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+  variables:
+    AWS_DEFAULT_REGION: eu-central-1
+
+  before_script:
+    # Configure AWS credentials from CI/CD variables
+    - export AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID
+    - export AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY
+    - export AWS_DEFAULT_REGION=$AWS_DEFAULT_REGION
+
+    # Build cdk-diff-report package
+    - npm install
+    - npm run build
+    - npm install -g .
+
+    # Install AWS CDK
+    - npm install -g aws-cdk
+
+    # Install test app dependencies
+    - cd test-cdk-app
+    - npm install
+
+  script:
+    # Override platform to gitlab for this pipeline
+    - |
+      cat > .cdkdiffreportrc <<EOF
+      {
+        "platform": "gitlab",
+        "cdkArgs": ["--all"],
+        "htmlOutput": "cdk-diff.html"
+      }
+      EOF
+    - cdk-diff-report
+
+  artifacts:
+    paths:
+      - test-cdk-app/cdk-diff.html
+    when: always
+    expire_in: 7 days
