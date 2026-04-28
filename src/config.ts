@@ -12,7 +12,7 @@ export interface Config {
 }
 
 const DEFAULTS: Config = {
-  cdkArgs: ['--all', '--ci'],
+  cdkArgs: ['--all'],
   platform: 'bitbucket',
   bitbucketApiUrl: 'https://api.bitbucket.org/2.0',
   dryRun: false,

@@ -77,19 +77,19 @@ export async function run(options: RunOptions = {}): Promise<void> {
   process.stdout.write('💬  Posting PR comment... ');
   try {
     if (config.platform === 'github') {
-      const { resolveGitHubEnv, buildGitHubPrUrl, postGitHubPrComment } = await import('./github');
+      const { resolveGitHubEnv, buildGitHubPrUrl, upsertGitHubPrComment } = await import('./github');
       const ghEnv = resolveGitHubEnv();
       prUrl = buildGitHubPrUrl(ghEnv);
-      await postGitHubPrComment(ghEnv, markdown);
+      await upsertGitHubPrComment(ghEnv, markdown);
     } else {
-      const { resolveBitbucketEnv, buildPrUrl, postPrComment } = await import('./bitbucket');
+      const { resolveBitbucketEnv, buildPrUrl, upsertPrComment } = await import('./bitbucket');
       const bbEnv = resolveBitbucketEnv({
         workspace: config.workspace,
         repoSlug: config.repoSlug,
         apiUrl: config.bitbucketApiUrl,
       });
       prUrl = buildPrUrl(bbEnv);
-      await postPrComment(bbEnv, markdown);
+      await upsertPrComment(bbEnv, markdown);
     }
     console.log('done ✓');
     console.log(`🔗  ${prUrl}\n`);

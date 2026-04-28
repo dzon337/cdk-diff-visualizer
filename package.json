@@ -1,7 +1,7 @@
 {
   "name": "cdk-diff-report",
   "version": "1.0.0",
-  "description": "Run cdk diff, stream output to console, and post a summary comment to your Bitbucket PR",
+  "description": "Run cdk diff, stream output to console, and post/update a summary comment on your Bitbucket or GitHub PR",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
@@ -13,7 +13,7 @@
     "test": "node --test 'dist/test/*.test.js'",
     "prepublishOnly": "npm run build && npm test"
   },
-  "keywords": ["cdk", "diff", "bitbucket", "pull-request", "aws", "devops"],
+  "keywords": ["cdk", "diff", "bitbucket", "github", "pull-request", "aws", "devops"],
   "author": "",
   "license": "MIT",
   "dependencies": {

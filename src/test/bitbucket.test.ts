@@ -1,6 +1,6 @@
 import { test, describe, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveBitbucketEnv, buildPrUrl } from '../bitbucket';
+import { resolveBitbucketEnv, buildPrUrl, withMarker } from '../bitbucket';
 
 const REQUIRED_ENV = {
   BITBUCKET_PR_ID: '42',
@@ -71,5 +71,21 @@ describe('buildPrUrl', () => {
     };
     const url = buildPrUrl(env);
     assert.equal(url, 'https://bitbucket.org/acme/infra-repo/pull-requests/99');
+  });
+});
+
+describe('withMarker', () => {
+  test('prepends hidden HTML comment marker', () => {
+    const result = withMarker('## Report\nSome content');
+    assert.ok(result.startsWith('<!-- cdk-diff-report -->'));
+    assert.ok(result.includes('## Report'));
+    assert.ok(result.includes('Some content'));
+  });
+
+  test('marker is on its own line', () => {
+    const result = withMarker('body');
+    const lines = result.split('\n');
+    assert.equal(lines[0], '<!-- cdk-diff-report -->');
+    assert.equal(lines[1], 'body');
   });
 });
