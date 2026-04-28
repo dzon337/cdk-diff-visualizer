@@ -13,16 +13,27 @@
     "test": "node --test 'dist/test/*.test.js'",
     "prepublishOnly": "npm run build && npm test"
   },
-  "keywords": ["cdk", "diff", "bitbucket", "github", "gitlab", "pull-request", "merge-request", "aws", "devops"],
+  "keywords": [
+    "cdk",
+    "diff",
+    "bitbucket",
+    "github",
+    "gitlab",
+    "pull-request",
+    "merge-request",
+    "aws",
+    "devops"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@aws-sdk/client-pricing": "^3.1038.0",
     "chalk": "^4.1.2"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "ts-node": "^10.9.0"
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=16"

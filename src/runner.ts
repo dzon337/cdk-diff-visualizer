@@ -49,6 +49,25 @@ export async function run(options: RunOptions = {}): Promise<void> {
   // ─── 3. Parse ────────────────────────────────────────────────────────────────
   const diff = parseCdkDiff(rawOutput);
 
+  // ─── 3b. Enrich with live AWS pricing ─────────────────────────────────────────
+  const allResources = diff.stacks.flatMap((s) => s.resources);
+  if (allResources.length > 0) {
+    try {
+      const { enrichWithLivePricing, calculateCostImpact } = await import('./cost-estimator');
+      const { liveCount } = await enrichWithLivePricing(allResources, cwd);
+      // Recalculate cost impact after enrichment
+      for (const stack of diff.stacks) {
+        stack.costImpact = calculateCostImpact(stack.resources);
+      }
+      diff.costImpact = calculateCostImpact(allResources);
+      if (liveCount > 0) {
+        console.log(`💰  Fetched live pricing for ${liveCount} resource(s) from AWS Pricing API`);
+      }
+    } catch {
+      // AWS Pricing API unavailable — static fallback already applied
+    }
+  }
+
   const totalChanges = diff.totalAdded + diff.totalModified + diff.totalRemoved;
   if (totalChanges === 0 && !diff.hasSecurityChanges) {
     console.log('\n✅  No infrastructure changes detected.\n');
@@ -56,7 +75,8 @@ export async function run(options: RunOptions = {}): Promise<void> {
     console.log(`\n📊  Summary: +${diff.totalAdded} added, ~${diff.totalModified} modified, -${diff.totalRemoved} removed`);
     if (diff.costImpact.netCost !== 0) {
       const emoji = diff.costImpact.netCost > 0 ? '📈' : '📉';
-      console.log(`${emoji}  Estimated cost impact: ${formatCostWithSign(diff.costImpact.netCost)}/mo`);
+      const source = diff.costImpact.liveResources > 0 ? ' (live pricing)' : ' (estimates)';
+      console.log(`${emoji}  Estimated cost impact: ${formatCostWithSign(diff.costImpact.netCost)}/mo${source}`);
     }
     if (diff.hasSecurityChanges) {
       console.log('🔐  IAM / Security Group changes detected — review carefully!');
