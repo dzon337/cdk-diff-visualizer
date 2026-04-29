@@ -1,115 +1,154 @@
 # cdk-diff-report
 
-Run `cdk diff`, stream the output live to your pipeline console, and automatically post a formatted summary comment to your **Bitbucket**, **GitHub**, or **GitLab** pull/merge request.
+> Run `cdk diff` and get a beautifully formatted cost-aware summary posted to your Bitbucket, GitHub, or GitLab PR/MR — automatically.
 
-On repeated pipeline runs the **existing comment is updated in-place** (upsert) instead of creating duplicates.
+![npm](https://img.shields.io/npm/v/cdk-diff-report)
+![node](https://img.shields.io/node/v/cdk-diff-report)
+![license](https://img.shields.io/npm/l/cdk-diff-report)
 
-## Install
+## What it does
+
+1. Runs `cdk diff` and streams the raw output to your pipeline console
+2. Parses the diff into a structured summary (added/modified/removed resources)
+3. **Estimates monthly cost impact** for each resource (live AWS Pricing API + static fallback)
+4. Posts a formatted Markdown comment to your PR/MR
+5. On subsequent runs, **updates the same comment** instead of creating duplicates
+
+## Quick Start
+
+### 1. Install
 
 ```bash
 npm install -g cdk-diff-report
-# or as a dev dependency
-npm install --save-dev cdk-diff-report
 ```
 
-## Usage
+### 2. Create a config file
 
-```bash
-cdk-diff-report
-```
-
-That's it. The tool:
-1. Reads your `.cdkdiffreportrc` config
-2. Runs `cdk diff` with your configured args
-3. Streams raw output to the console (visible in pipeline logs)
-4. Parses the diff and posts a formatted Markdown summary as a PR/MR comment
-5. On subsequent runs, **updates** the existing comment instead of creating a new one
-6. Prints the PR/MR link to the console
-
-```bash
-cdk-diff-report --dry-run   # runs diff, prints markdown preview, skips posting
-cdk-diff-report --help
-```
-
-## Configuration
-
-Create a `.cdkdiffreportrc` file in your project root:
+Create a `.cdkdiffreportrc` file **in the root of your CDK project** (next to `cdk.json`):
 
 ```json
 {
-  "platform": "bitbucket",
+  "platform": "github",
   "cdkArgs": ["--all"],
-  "htmlOutput": "cdk-diff.html",
-  "dryRun": false
+  "htmlOutput": "cdk-diff.html"
 }
 ```
+
+### 3. Run it
+
+```bash
+# In your CDK project directory (where cdk.json lives):
+cdk-diff-report              # run diff + post PR comment
+cdk-diff-report --dry-run    # run diff + print markdown preview (no posting)
+cdk-diff-report --help       # show all options
+```
+
+---
+
+## Configuration
+
+### Where to put `.cdkdiffreportrc`
+
+Place the file **in the root of the project where you run `cdk diff`** — the same
+directory as your `cdk.json`. The tool looks for `.cdkdiffreportrc` or
+`.cdkdiffreportrc.json` in the current working directory.
+
+```
+my-cdk-project/
+├── cdk.json
+├── .cdkdiffreportrc      ← put it here
+├── lib/
+│   └── my-stack.ts
+├── bin/
+│   └── app.ts
+└── package.json
+```
+
+### All options
+
+```jsonc
+{
+  // Required: which CI platform are you using?
+  // Options: "bitbucket" | "github" | "gitlab"
+  "platform": "github",
+
+  // Arguments forwarded to `cdk diff`
+  // Default: ["--all"]
+  // Examples:
+  //   ["--all"]                     → diff all stacks
+  //   ["MyStack"]                   → diff only MyStack
+  //   ["--all", "--no-change-set"]  → skip change set creation (faster)
+  "cdkArgs": ["--all"],
+
+  // Optional: write a standalone HTML report to this file path
+  // Great for CI artifacts — gives you a visual dashboard
+  "htmlOutput": "cdk-diff.html",
+
+  // Optional: never post to PR, just preview in the terminal
+  // Default: false
+  "dryRun": false,
+
+  // Bitbucket Server only — override the API base URL
+  // Default: "https://api.bitbucket.org/2.0"
+  "bitbucketApiUrl": "https://api.bitbucket.org/2.0",
+
+  // Self-managed GitLab only — override the API URL
+  // Default: auto-detected from $CI_API_V4_URL or "https://gitlab.com/api/v4"
+  "gitlabApiUrl": "https://gitlab.mycompany.com/api/v4"
+}
+```
+
+> **Note:** JSON does not support comments. The `//` comments above are for
+> illustration only. Your actual `.cdkdiffreportrc` must be valid JSON without comments.
+
+### Options reference
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
 | `platform` | `string` | `"bitbucket"` | CI platform: `"bitbucket"`, `"github"`, or `"gitlab"` |
-| `cdkArgs` | `string[]` | `["--all"]` | Args forwarded verbatim to `cdk diff` |
-| `htmlOutput` | `string` | — | Write a standalone HTML report to this path |
+| `cdkArgs` | `string[]` | `["--all"]` | Arguments forwarded to `cdk diff` |
+| `htmlOutput` | `string` | — | Path to write a standalone HTML report |
 | `dryRun` | `boolean` | `false` | Skip posting, print markdown preview instead |
 | `bitbucketApiUrl` | `string` | `https://api.bitbucket.org/2.0` | Override for Bitbucket Server |
-| `gitlabApiUrl` | `string` | `$CI_API_V4_URL` or `https://gitlab.com/api/v4` | Override for self-managed GitLab |
-| `workspace` | `string` | `$BITBUCKET_WORKSPACE` | Override workspace slug (Bitbucket) |
-| `repoSlug` | `string` | `$BITBUCKET_REPO_SLUG` | Override repo slug (Bitbucket) |
+| `gitlabApiUrl` | `string` | auto-detected | Override for self-managed GitLab |
+| `workspace` | `string` | `$BITBUCKET_WORKSPACE` | Override Bitbucket workspace slug |
+| `repoSlug` | `string` | `$BITBUCKET_REPO_SLUG` | Override Bitbucket repo slug |
 
-## Bitbucket
+---
 
-### Environment Variables
+## Cost Estimation
 
-These are set automatically by Bitbucket Pipelines:
+The tool estimates the monthly cost impact of your infrastructure changes using a
+**three-tier strategy**:
 
-| Variable | Description |
-|----------|-------------|
-| `BITBUCKET_PR_ID` | PR number (only set on PR builds) |
-| `BITBUCKET_WORKSPACE` | Workspace slug |
-| `BITBUCKET_REPO_SLUG` | Repository slug |
-| `BITBUCKET_ACCESS_TOKEN` | **You must create this.** Repository → Settings → Access tokens. Needs `pullrequest:write` scope. |
+1. **CloudFormation template analysis** — reads actual resource properties from `cdk.out/`
+   (instance types, memory sizes, DB engines, etc.)
+2. **AWS Pricing API** — queries real on-demand prices for EC2, RDS, ElastiCache,
+   NAT Gateway, Lambda, and ECS Fargate
+3. **Static fallback** — uses a built-in table of ~80 resource types when the API
+   is unavailable
 
-> If `BITBUCKET_PR_ID` is not set (e.g. a push to main), the tool runs `cdk diff` and prints the summary but skips the PR comment gracefully — no crash.
+The cost column appears in both the PR comment and the HTML report:
 
-### Bitbucket Pipelines setup
-
-```yaml
-# bitbucket-pipelines.yml
-pipelines:
-  pull-requests:
-    '**':
-      - step:
-          name: CDK Diff
-          script:
-            - npm ci
-            - npx cdk-diff-report
-          after-script:
-            # always runs, even if diff finds changes (exit code 1)
-            - echo "Done"
+```
+| ✅ Added | `MyBucket`      | S3 › Bucket     | +$0.023/mo |
+| ✅ Added | `MyFunction`    | Lambda › Func   | +$0.620/mo |
+| ❌ Removed | `OldDb`       | RDS › DBInstance | -$49.64/mo |
 ```
 
-Add `BITBUCKET_ACCESS_TOKEN` as a **Repository variable** in Bitbucket → Repository settings → Repository variables.
+> Cost estimates require AWS credentials (the same ones used for `cdk diff`).
+> If credentials are unavailable, the tool falls back to static estimates silently.
 
-## GitHub
+---
 
-### Environment Variables
+## Platform Setup
 
-These are set automatically by GitHub Actions:
-
-| Variable | Description |
-|----------|-------------|
-| `GITHUB_REF` | Git ref (PR number extracted from `refs/pull/N/merge`) |
-| `GITHUB_PR_NUMBER` | Alternative: set the PR number directly |
-| `GITHUB_REPOSITORY` | `owner/repo` |
-| `GITHUB_REPOSITORY_OWNER` | Repository owner |
-| `GITHUB_TOKEN` | Automatically provided by GitHub Actions (needs `pull-requests: write`) |
-
-### GitHub Actions setup
+### GitHub Actions
 
 ```yaml
 # .github/workflows/cdk-diff.yml
 name: CDK Diff
-on:
-  pull_request:
+on: pull_request
 
 jobs:
   cdk-diff:
@@ -126,25 +165,20 @@ jobs:
       - run: npx cdk-diff-report
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: eu-central-1
 ```
 
-## GitLab
+**Environment variables** (set automatically by GitHub Actions):
 
-### Environment Variables
+| Variable | Source |
+|----------|--------|
+| `GITHUB_TOKEN` | Auto-provided, needs `pull-requests: write` permission |
+| `GITHUB_REF` | Auto-set, PR number extracted from `refs/pull/N/merge` |
+| `GITHUB_REPOSITORY` | Auto-set (`owner/repo`) |
 
-These are set automatically by GitLab CI/CD when using **merge request pipelines**:
-
-| Variable | Description |
-|----------|-------------|
-| `CI_PROJECT_ID` | Numeric project ID |
-| `CI_MERGE_REQUEST_IID` | Merge request IID (only set for MR pipelines) |
-| `GITLAB_TOKEN` | **You must create this.** Project or personal access token with `api` scope. |
-| `CI_JOB_TOKEN` | Fallback — auto-provided, but has limited permissions. Prefer `GITLAB_TOKEN`. |
-| `CI_API_V4_URL` | Auto-set to `https://gitlab.com/api/v4` (or your self-managed instance URL) |
-
-> **Important:** `CI_MERGE_REQUEST_IID` is only available in [merge request pipelines](https://docs.gitlab.com/ee/ci/pipelines/merge_request_pipelines.html). Make sure your `.gitlab-ci.yml` uses `rules` or `only: - merge_requests`.
-
-### GitLab CI/CD setup
+### GitLab CI/CD
 
 ```yaml
 # .gitlab-ci.yml
@@ -156,120 +190,117 @@ cdk-diff:
     - npm ci
     - npx cdk-diff-report
   variables:
-    GITLAB_TOKEN: $CDK_DIFF_GITLAB_TOKEN   # set in CI/CD Settings → Variables
+    GITLAB_TOKEN: $CDK_DIFF_GITLAB_TOKEN
 ```
 
-Add `CDK_DIFF_GITLAB_TOKEN` as a **CI/CD variable** in GitLab → Settings → CI/CD → Variables (masked, protected recommended).
+Add `CDK_DIFF_GITLAB_TOKEN` in **Settings → CI/CD → Variables** (masked, protected).
 
-#### Self-managed GitLab
+> **Important:** `CI_MERGE_REQUEST_IID` is only set in
+> [merge request pipelines](https://docs.gitlab.com/ee/ci/pipelines/merge_request_pipelines.html).
+> Make sure you use `rules: - if: $CI_PIPELINE_SOURCE == "merge_request_event"`.
 
-For self-managed instances, `CI_API_V4_URL` is automatically set to the correct API URL. Alternatively, override it in `.cdkdiffreportrc`:
+| Variable | Source |
+|----------|--------|
+| `GITLAB_TOKEN` | **You create this** — project token with `api` scope |
+| `CI_PROJECT_ID` | Auto-set |
+| `CI_MERGE_REQUEST_IID` | Auto-set (MR pipelines only) |
+| `CI_API_V4_URL` | Auto-set |
 
-```json
-{
-  "platform": "gitlab",
-  "gitlabApiUrl": "https://gitlab.mycompany.com/api/v4"
-}
-```
-
-## AWS CodePipeline / CodeBuild
+### Bitbucket Pipelines
 
 ```yaml
-# buildspec.yml
-phases:
-  build:
-    commands:
-      - npm ci
-      - npx cdk-diff-report
+# bitbucket-pipelines.yml
+pipelines:
+  pull-requests:
+    '**':
+      - step:
+          name: CDK Diff
+          script:
+            - npm ci
+            - npx cdk-diff-report
 ```
 
-Set the appropriate token (`BITBUCKET_ACCESS_TOKEN`, `GITHUB_TOKEN`, or `GITLAB_TOKEN`) as a CodeBuild environment variable (from Secrets Manager recommended).
+Add `BITBUCKET_ACCESS_TOKEN` in **Repository settings → Repository variables**.
 
-## PR/MR Comment example
+| Variable | Source |
+|----------|--------|
+| `BITBUCKET_ACCESS_TOKEN` | **You create this** — needs `pullrequest:write` scope |
+| `BITBUCKET_PR_ID` | Auto-set |
+| `BITBUCKET_WORKSPACE` | Auto-set |
+| `BITBUCKET_REPO_SLUG` | Auto-set |
 
-The tool posts a collapsible Markdown comment per stack:
+---
+
+## PR/MR Comment Preview
+
+The tool posts a collapsible Markdown comment with per-stack breakdown:
 
 ```
 ## 🚀 CDK Diff Report
 
-| ✅ Added | ⚠️ Modified | ❌ Removed | 🔐 IAM stacks |
-|---------|------------|-----------|--------------| 
-| 3       | 2          | 1         | 1            |
+> 📈 **Estimated monthly cost impact: +$1.04/mo**
+
+| ✅ Added | ⚠️ Modified | ❌ Removed | 🔐 IAM stacks | 💰 Est. cost |
+|---------|------------|-----------|--------------|-------------|
+| 5       | 0          | 0         | 1            | +$1.04/mo   |
 
 <details>
-<summary><strong>EcsResources</strong> — +3 · ~1 · 🔐 IAM</summary>
-...
+<summary><strong>MyStack</strong> — +5 · 🔐 IAM · 💰 +$1.04/mo</summary>
+
+| Change    | Logical ID   | Type           | Est. Cost    |
+|-----------|-------------|----------------|--------------|
+| ✅ Added  | `MyBucket`  | S3 › Bucket    | +$0.023/mo   |
+| ✅ Added  | `MyFunction`| Lambda › Func  | +$0.620/mo   |
+| ✅ Added  | `MyQueue`   | SQS › Queue    | +$0.400/mo   |
 </details>
 ```
 
-On the next pipeline run, the **same comment is updated** with the latest diff instead of creating a new one.
+On the next run, the **same comment is updated** with the latest diff.
 
-## Use as a library
+---
+
+## Use as a Library
 
 ```typescript
-import { run, parseCdkDiff, generateMarkdownComment } from 'cdk-diff-report';
+import { run, parseCdkDiff, generateMarkdownComment, enrichWithLivePricing } from 'cdk-diff-report';
 
 // Full run (diff + comment)
 await run({ dryRun: true });
 
-// Or just the parser
+// Just the parser
 const diff = parseCdkDiff(rawCdkOutput);
-console.log(diff.totalAdded, diff.stacks);
-```
+console.log(diff.totalAdded, diff.costImpact.netCost);
 
-### Bitbucket comment management
-
-```typescript
-import {
-  resolveBitbucketEnv,
-  upsertPrComment,
-  listPrComments,
-  deletePrComment,
-} from 'cdk-diff-report';
-
-const env = resolveBitbucketEnv();
-
-// Upsert — creates or updates the cdk-diff-report comment
-await upsertPrComment(env, '## My Report\n...');
-
-// List all comments
-const comments = await listPrComments(env);
-
-// Delete a specific comment
-await deletePrComment(env, commentId);
-```
-
-### GitHub comment management
-
-```typescript
-import {
-  resolveGitHubEnv,
-  upsertGitHubPrComment,
-  listGitHubPrComments,
-} from 'cdk-diff-report';
-
+// Platform-specific comment management
+import { resolveGitHubEnv, upsertGitHubPrComment } from 'cdk-diff-report';
 const env = resolveGitHubEnv();
 await upsertGitHubPrComment(env, '## My Report\n...');
 ```
 
-### GitLab comment management
+---
 
-```typescript
-import {
-  resolveGitLabEnv,
-  upsertMrNote,
-  listMrNotes,
-  deleteMrNote,
-} from 'cdk-diff-report';
+## FAQ
 
-const env = resolveGitLabEnv();
+**Q: Where does `.cdkdiffreportrc` go?**
+A: In the root of your CDK project — the same directory where `cdk.json` lives.
 
-// Upsert — creates or updates the cdk-diff-report MR note
-await upsertMrNote(env, '## My Report\n...');
+**Q: Do I need AWS credentials for cost estimation?**
+A: The tool uses the same AWS credentials you already provide for `cdk diff`.
+If credentials are missing, cost estimates fall back to static defaults.
 
-// List all MR notes
-const notes = await listMrNotes(env);
+**Q: What if I don't have a PR (e.g. push to main)?**
+A: The tool runs `cdk diff` and prints the summary to the console, but skips
+the PR comment gracefully — no crash.
 
-// Delete a specific note
-await deleteMrNote(env, noteId);
-```
+**Q: Can I diff only specific stacks?**
+A: Yes, set `"cdkArgs": ["MyStack", "OtherStack"]` in your config.
+
+**Q: Does it support monorepos?**
+A: Yes, run `cdk-diff-report` from the directory containing `cdk.json`.
+Each CDK app needs its own `.cdkdiffreportrc`.
+
+---
+
+## License
+
+MIT

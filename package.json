@@ -8,10 +8,10 @@
     "cdk-diff-report": "dist/cli.js"
   },
   "files": [
-    "dist/**/*.js",
-    "dist/**/*.d.ts",
-    "dist/**/*.js.map",
-    "dist/**/*.d.ts.map",
+    "dist/*.js",
+    "dist/*.d.ts",
+    "dist/*.js.map",
+    "dist/*.d.ts.map",
     "README.md",
     "LICENSE"
   ],

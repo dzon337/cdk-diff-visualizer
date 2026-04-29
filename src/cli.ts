@@ -6,44 +6,33 @@ const dryRun = args.includes('--dry-run') || args.includes('--dry');
 
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`
-cdk-diff-report
-
-Runs \`cdk diff\` (using args from .cdkdiffreportrc), streams output to the
-console, then posts a formatted summary comment to your pull request.
-
-Supports Bitbucket, GitHub, and GitLab. On repeated runs the existing comment is
-updated in-place (upsert) instead of creating duplicates.
+cdk-diff-report — Run cdk diff and post a cost-aware summary to your PR/MR.
 
 Usage:
   cdk-diff-report              Run diff and post/update PR comment
   cdk-diff-report --dry-run    Run diff, print markdown preview, skip posting
   cdk-diff-report --help       Show this help
 
-Configuration (.cdkdiffreportrc in project root):
+Configuration:
+  Create a .cdkdiffreportrc file in your CDK project root (next to cdk.json):
+
   {
-    "platform": "bitbucket",        // "bitbucket" (default), "github", or "gitlab"
-    "cdkArgs": ["--all"],           // args forwarded to cdk diff
-    "htmlOutput": "cdk-diff.html",  // optional: write HTML report to file
-    "dryRun": false                 // optional: never post, just preview
+    "platform": "github",          "bitbucket" | "github" | "gitlab"
+    "cdkArgs": ["--all"],          args forwarded to cdk diff
+    "htmlOutput": "cdk-diff.html", write HTML report to this path
+    "dryRun": false                skip posting, just preview
   }
 
-Bitbucket env vars (set automatically by Bitbucket Pipelines):
-  BITBUCKET_PR_ID
-  BITBUCKET_WORKSPACE
-  BITBUCKET_REPO_SLUG
-  BITBUCKET_ACCESS_TOKEN          // repository access token with pullrequest:write
+Environment variables (platform-specific):
 
-GitHub env vars (set automatically by GitHub Actions):
-  GITHUB_REF                      // or GITHUB_PR_NUMBER
-  GITHUB_REPOSITORY
-  GITHUB_REPOSITORY_OWNER
-  GITHUB_TOKEN
+  GitHub:    GITHUB_TOKEN (auto-provided by Actions, needs pull-requests: write)
+  GitLab:    GITLAB_TOKEN (project token with api scope, add as CI/CD variable)
+  Bitbucket: BITBUCKET_ACCESS_TOKEN (repo token with pullrequest:write)
 
-GitLab env vars (set automatically by GitLab CI merge request pipelines):
-  CI_PROJECT_ID
-  CI_MERGE_REQUEST_IID
-  GITLAB_TOKEN                    // or CI_JOB_TOKEN (needs api scope)
-  CI_API_V4_URL                   // auto-set, defaults to https://gitlab.com/api/v4
+  AWS (for cdk diff + live cost pricing):
+    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
+
+Docs: https://github.com/dzon337/cdk-diff-visualizer#readme
 `);
   process.exit(0);
 }
