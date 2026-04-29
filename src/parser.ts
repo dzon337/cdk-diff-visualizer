@@ -71,7 +71,7 @@ export function parseCdkDiff(raw: string): ParsedDiff {
         hasIamChanges: false,
         hasSecurityGroupChanges: false,
         noChanges: false,
-        costImpact: { addedCost: 0, removedCost: 0, netCost: 0, knownResources: 0, unknownResources: 0 },
+        costImpact: { addedCost: 0, removedCost: 0, netCost: 0, knownResources: 0, unknownResources: 0, liveResources: 0 },
       };
       stacks.push(current);
       inResources = false;

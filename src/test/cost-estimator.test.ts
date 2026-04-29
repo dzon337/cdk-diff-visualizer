@@ -14,6 +14,7 @@ describe('estimateResourceCost', () => {
     assert.equal(typeof est!.monthlyCost, 'number');
     assert.equal(typeof est!.note, 'string');
     assert.equal(typeof est!.isFreeTier, 'boolean');
+    assert.equal(est!.isLive, false); // static fallback
   });
 
   test('returns null for unknown resource type', () => {
@@ -98,6 +99,24 @@ describe('calculateCostImpact', () => {
     assert.equal(impact.netCost, 0);
     assert.equal(impact.knownResources, 0);
     assert.equal(impact.unknownResources, 0);
+    assert.equal(impact.liveResources, 0);
+  });
+
+  test('tracks live vs fallback resources', () => {
+    const impact = calculateCostImpact([
+      {
+        changeType: 'add',
+        awsType: 'AWS::EC2::Instance',
+        estimatedCost: { monthlyCost: 100, isFreeTier: false, note: 'live', isLive: true },
+      },
+      {
+        changeType: 'add',
+        awsType: 'AWS::S3::Bucket',
+        estimatedCost: { monthlyCost: 0.023, isFreeTier: true, note: 'fallback', isLive: false },
+      },
+    ]);
+    assert.equal(impact.liveResources, 1);
+    assert.equal(impact.knownResources, 2);
   });
 });
 

@@ -6,11 +6,21 @@ export { loadConfig } from './config';
 export type { Config } from './config';
 export {
   estimateResourceCost,
+  estimateResourceCostLive,
+  enrichWithLivePricing,
   calculateCostImpact,
   formatCost,
   formatCostWithSign,
 } from './cost-estimator';
 export type { CostEstimate, CostImpact } from './cost-estimator';
+export { readTemplates } from './template-reader';
+export type { ResourceProperties, TemplateResources } from './template-reader';
+export {
+  getEc2Price,
+  getRdsPrice,
+  getElastiCachePrice,
+  getNatGatewayPrice,
+} from './aws-pricing';
 export {
   resolveBitbucketEnv,
   buildPrUrl,
