@@ -229,6 +229,93 @@ Add `BITBUCKET_ACCESS_TOKEN` in **Repository settings → Repository variables**
 | `BITBUCKET_WORKSPACE` | Auto-set |
 | `BITBUCKET_REPO_SLUG` | Auto-set |
 
+### AWS CodePipeline + CodeBuild → Bitbucket
+
+When your CDK project uses **AWS CodePipeline** triggered by Bitbucket PRs,
+CodeBuild doesn't set the Bitbucket env vars automatically. You need to provide
+them yourself.
+
+#### Step 1: Store the Bitbucket token in Secrets Manager
+
+```bash
+aws secretsmanager create-secret \
+  --name bitbucket/access-token \
+  --secret-string "YOUR_BITBUCKET_APP_PASSWORD_OR_TOKEN"
+```
+
+> Create a Bitbucket **App Password** at https://bitbucket.org/account/settings/app-passwords/
+> with the `pullrequest:write` scope. Or use a repository access token.
+
+#### Step 2: Configure your buildspec
+
+When CodeBuild is triggered by a PR webhook, the env var `CODEBUILD_WEBHOOK_TRIGGER`
+is set to `pr/123` (where 123 is the PR number). Extract it in your buildspec:
+
+```yaml
+# buildspec.yml
+version: 0.2
+env:
+  secrets-manager:
+    BITBUCKET_ACCESS_TOKEN: "bitbucket/access-token"
+  variables:
+    # Set these to match your Bitbucket repository
+    BITBUCKET_WORKSPACE: "my-team"
+    BITBUCKET_REPO_SLUG: "my-cdk-app"
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - npm ci
+      - npm install -g aws-cdk cdk-diff-report
+
+  build:
+    commands:
+      # Extract PR ID from CodeBuild webhook trigger (format: "pr/123")
+      - export BITBUCKET_PR_ID=$(echo $CODEBUILD_WEBHOOK_TRIGGER | grep -oP '\d+')
+      - echo "PR ID = $BITBUCKET_PR_ID"
+
+      # Run the diff + post comment to Bitbucket
+      - cdk-diff-report
+
+artifacts:
+  files:
+    - cdk-diff.html
+  discard-paths: yes
+```
+
+#### Step 3: Set up CodeBuild
+
+In your CodeBuild project:
+
+1. **Source**: Connect to Bitbucket via CodeStar Connections
+2. **Webhook**: Enable webhook events for `PULL_REQUEST_CREATED` and `PULL_REQUEST_UPDATED`
+3. **IAM Role**: Grant the CodeBuild role permission to read from Secrets Manager:
+   ```json
+   {
+     "Effect": "Allow",
+     "Action": "secretsmanager:GetSecretValue",
+     "Resource": "arn:aws:secretsmanager:*:*:secret:bitbucket/access-token-*"
+   }
+   ```
+4. **Environment variables**: Set `BITBUCKET_WORKSPACE` and `BITBUCKET_REPO_SLUG`
+   either in the buildspec (above) or in the CodeBuild project configuration.
+
+#### How it works
+
+```
+Bitbucket PR created/updated
+  → CodeBuild webhook trigger: CODEBUILD_WEBHOOK_TRIGGER=pr/123
+    → buildspec extracts PR ID: BITBUCKET_PR_ID=123
+      → cdk-diff-report runs cdk diff
+        → posts formatted comment to Bitbucket PR #123
+```
+
+> **Tip:** If you're using CodePipeline (not direct CodeBuild webhook), the PR ID
+> is not available via `CODEBUILD_WEBHOOK_TRIGGER`. In that case, pass it as a
+> CodePipeline variable or use a Lambda step to resolve it from the source revision.
+
 ---
 
 ## PR/MR Comment Preview

@@ -16,7 +16,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && chmod +x dist/cli.js",
+    "build": "tsc",
     "dev": "ts-node src/cli.ts",
     "test": "node --test 'dist/test/*.test.js'",
     "prepublishOnly": "npm run build && npm test"
