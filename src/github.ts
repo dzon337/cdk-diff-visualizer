@@ -1,169 +1,72 @@
-export interface GitHubEnv {
-    prNumber: string;
-    owner: string;
-    repo: string;
-    token: string;
-    apiUrl: string;
-}
+/**
+ * GitHub API integration — list, post, update, and upsert PR comments
+ * with hidden-marker-based deduplication.
+ * @module github
+ */
+
+export interface GitHubEnv { prNumber: string; owner: string; repo: string; token: string; apiUrl: string }
 
 export function resolveGitHubEnv(): GitHubEnv {
-    const prNumber = extractPrFromRef(process.env['GITHUB_REF'] ?? '')
-        || process.env['GITHUB_PR_NUMBER']
-        || '';
-
-    const owner = process.env['GITHUB_REPOSITORY_OWNER'] ?? '';
-    const fullRepo = process.env['GITHUB_REPOSITORY'] ?? '';
-    const repo = fullRepo.split('/')[1] ?? '';
-    const token = process.env['GITHUB_TOKEN'] ?? '';
-    const apiUrl = process.env['GITHUB_API_URL'] ?? 'https://api.github.com';
-
-    const missing: string[] = [];
-    if (!prNumber) missing.push('GITHUB_PR_NUMBER (or GITHUB_REF=refs/pull/N/merge)');
-    if (!owner) missing.push('GITHUB_REPOSITORY_OWNER');
-    if (!repo) missing.push('GITHUB_REPOSITORY');
-    if (!token) missing.push('GITHUB_TOKEN');
-
-    if (missing.length > 0) {
-        throw new Error(
-            `Missing required environment variables: ${missing.join(', ')}\n` +
-            `These are set automatically by GitHub Actions.`
-        );
-    }
-
-    return { prNumber, owner, repo, token, apiUrl };
+  const prNumber = extractPrFromRef(process.env['GITHUB_REF'] ?? '') || process.env['GITHUB_PR_NUMBER'] || '';
+  const owner = process.env['GITHUB_REPOSITORY_OWNER'] ?? '';
+  const repo = (process.env['GITHUB_REPOSITORY'] ?? '').split('/')[1] ?? '';
+  const token = process.env['GITHUB_TOKEN'] ?? '';
+  const apiUrl = process.env['GITHUB_API_URL'] ?? 'https://api.github.com';
+  const missing = [!prNumber && 'GITHUB_PR_NUMBER', !owner && 'GITHUB_REPOSITORY_OWNER', !repo && 'GITHUB_REPOSITORY', !token && 'GITHUB_TOKEN'].filter(Boolean);
+  if (missing.length) throw new Error(`Missing required environment variables: ${missing.join(', ')}\nSet automatically by GitHub Actions.`);
+  return { prNumber, owner, repo, token, apiUrl };
 }
 
 export function buildGitHubPrUrl(env: GitHubEnv): string {
-    return `https://github.com/${env.owner}/${env.repo}/pull/${env.prNumber}`;
+  return `https://github.com/${env.owner}/${env.repo}/pull/${env.prNumber}`;
 }
 
-// ─── Comment marker for upsert ─────────────────────────────────────────────────
 const COMMENT_MARKER = '<!-- cdk-diff-report -->';
+export function withMarker(md: string): string { return `${COMMENT_MARKER}\n${md}`; }
 
-/** Wrap markdown with the hidden marker used for upsert detection. */
-export function withMarker(markdown: string): string {
-    return `${COMMENT_MARKER}\n${markdown}`;
+interface GHComment { id: number; body: string }
+
+function headers(env: GitHubEnv): Record<string, string> {
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${env.token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+}
+function baseUrl(env: GitHubEnv): string {
+  return `${env.apiUrl}/repos/${env.owner}/${env.repo}/issues/${env.prNumber}/comments`;
 }
 
-// ─── GitHub API types (minimal) ─────────────────────────────────────────────────
-
-interface GitHubComment {
-    id: number;
-    body: string;
+export async function listPrComments(env: GitHubEnv): Promise<GHComment[]> {
+  const all: GHComment[] = [];
+  let url: string | undefined = `${baseUrl(env)}?per_page=100`;
+  while (url) {
+    const r = await fetch(url, { method: 'GET', headers: headers(env) });
+    if (!r.ok) throw new Error(`GitHub API ${r.status}: ${await r.text()}`);
+    all.push(...(await r.json()) as GHComment[]);
+    const link = r.headers.get('link') ?? '';
+    const next = link.match(/<([^>]+)>;\s*rel="next"/);
+    url = next ? next[1] : undefined;
+  }
+  return all;
 }
 
-// ─── API helpers ────────────────────────────────────────────────────────────────
-
-function authHeaders(env: GitHubEnv): Record<string, string> {
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${env.token}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-    };
-}
-
-function commentsBaseUrl(env: GitHubEnv): string {
-    return `${env.apiUrl}/repos/${env.owner}/${env.repo}/issues/${env.prNumber}/comments`;
-}
-
-/**
- * List all comments on a pull request (handles GitHub pagination).
- */
-export async function listPrComments(env: GitHubEnv): Promise<GitHubComment[]> {
-    const all: GitHubComment[] = [];
-    let url: string | undefined = `${commentsBaseUrl(env)}?per_page=100`;
-
-    while (url) {
-        const response = await fetch(url, {
-            method: 'GET',
-            headers: authHeaders(env),
-        });
-
-        if (!response.ok) {
-            const body = await response.text();
-            throw new Error(`GitHub API error ${response.status} ${response.statusText}: ${body}`);
-        }
-
-        const data = (await response.json()) as GitHubComment[];
-        all.push(...data);
-
-        // Parse Link header for next page
-        const linkHeader = response.headers.get('link') ?? '';
-        const nextMatch = linkHeader.match(/<([^>]+)>;\s*rel="next"/);
-        url = nextMatch ? nextMatch[1] : undefined;
-    }
-
-    return all;
-}
-
-/**
- * Find a previous cdk-diff-report comment by looking for the hidden marker.
- */
 export async function findExistingComment(env: GitHubEnv): Promise<number | null> {
-    const comments = await listPrComments(env);
-    const existing = comments.find((c) => c.body?.includes(COMMENT_MARKER));
-    return existing ? existing.id : null;
+  const c = (await listPrComments(env)).find((c) => c.body?.includes(COMMENT_MARKER));
+  return c ? c.id : null;
 }
 
-/**
- * Create a new PR comment.
- */
-export async function postGitHubPrComment(env: GitHubEnv, markdown: string): Promise<void> {
-    const url = commentsBaseUrl(env);
-
-    const response = await fetch(url, {
-        method: 'POST',
-        headers: authHeaders(env),
-        body: JSON.stringify({ body: markdown }),
-    });
-
-    if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`GitHub API error ${response.status} ${response.statusText}: ${body}`);
-    }
+export async function postGitHubPrComment(env: GitHubEnv, md: string): Promise<void> {
+  const r = await fetch(baseUrl(env), { method: 'POST', headers: headers(env), body: JSON.stringify({ body: md }) });
+  if (!r.ok) throw new Error(`GitHub API ${r.status}: ${await r.text()}`);
 }
 
-/**
- * Update an existing PR comment by ID.
- */
-export async function updateGitHubPrComment(
-    env: GitHubEnv,
-    commentId: number,
-    markdown: string
-): Promise<void> {
-    const url = `${env.apiUrl}/repos/${env.owner}/${env.repo}/issues/comments/${commentId}`;
-
-    const response = await fetch(url, {
-        method: 'PATCH',
-        headers: authHeaders(env),
-        body: JSON.stringify({ body: markdown }),
-    });
-
-    if (!response.ok) {
-        const body = await response.text();
-        throw new Error(`GitHub API error ${response.status} ${response.statusText}: ${body}`);
-    }
+export async function updateGitHubPrComment(env: GitHubEnv, id: number, md: string): Promise<void> {
+  const r = await fetch(`${env.apiUrl}/repos/${env.owner}/${env.repo}/issues/comments/${id}`, { method: 'PATCH', headers: headers(env), body: JSON.stringify({ body: md }) });
+  if (!r.ok) throw new Error(`GitHub API ${r.status}: ${await r.text()}`);
 }
 
-/**
- * Upsert a PR comment: update the existing cdk-diff-report comment if one
- * exists, otherwise create a new one. The comment body is wrapped with a
- * hidden marker so it can be found on subsequent runs.
- */
-export async function upsertGitHubPrComment(env: GitHubEnv, markdown: string): Promise<void> {
-    const markedBody = withMarker(markdown);
-
-    const existingId = await findExistingComment(env);
-
-    if (existingId !== null) {
-        await updateGitHubPrComment(env, existingId, markedBody);
-    } else {
-        await postGitHubPrComment(env, markedBody);
-    }
+/** Upsert a PR comment — update existing or create new. */
+export async function upsertGitHubPrComment(env: GitHubEnv, md: string): Promise<void> {
+  const marked = withMarker(md);
+  const existing = await findExistingComment(env);
+  existing !== null ? await updateGitHubPrComment(env, existing, marked) : await postGitHubPrComment(env, marked);
 }
 
-function extractPrFromRef(ref: string): string {
-    const match = ref.match(/refs\/pull\/(\d+)\//);
-    return match?.[1] ?? '';
-}
+function extractPrFromRef(ref: string): string { return ref.match(/refs\/pull\/(\d+)\//)?.[1] ?? ''; }

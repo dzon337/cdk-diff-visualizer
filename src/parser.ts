@@ -1,3 +1,8 @@
+/**
+ * Parses raw `cdk diff` stdout into structured resource change data.
+ * @module parser
+ */
+
 import { estimateResourceCost, calculateCostImpact, CostEstimate, CostImpact } from './cost-estimator';
 
 export type ChangeType = 'add' | 'modify' | 'remove';
@@ -8,7 +13,6 @@ export interface ResourceChange {
   logicalId: string;
   physicalId?: string;
   raw: string;
-  /** Estimated monthly cost for this resource type (null if unknown) */
   estimatedCost: CostEstimate | null;
 }
 
@@ -18,7 +22,6 @@ export interface StackDiff {
   hasIamChanges: boolean;
   hasSecurityGroupChanges: boolean;
   noChanges: boolean;
-  /** Aggregate cost impact of changes in this stack */
   costImpact: CostImpact;
 }
 
@@ -28,125 +31,66 @@ export interface ParsedDiff {
   totalModified: number;
   totalRemoved: number;
   hasSecurityChanges: boolean;
-  /** Aggregate cost impact across all stacks */
   costImpact: CostImpact;
 }
 
-const CHANGE_SYMBOLS: Record<string, ChangeType> = {
-  '+': 'add',
-  '~': 'modify',
-  '!': 'modify',
-  '-': 'remove',
-};
+const CHANGE_SYMBOLS: Record<string, ChangeType> = { '+': 'add', '~': 'modify', '!': 'modify', '-': 'remove' };
+const ZERO_IMPACT: CostImpact = { addedCost: 0, removedCost: 0, netCost: 0, knownResources: 0, unknownResources: 0, liveResources: 0 };
 
-// Strip ANSI escape codes emitted by cdk diff (colors, bold, cursor moves)
-function stripAnsi(str: string): string {
+function stripAnsi(s: string): string {
   // eslint-disable-next-line no-control-regex
-  return str.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
+  return s.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
 }
 
+/** Parse raw `cdk diff` output into structured diff data with cost estimates. */
 export function parseCdkDiff(raw: string): ParsedDiff {
-  const cleaned = stripAnsi(raw);
-  console.log("STARTED PARSING")
-  // DEBUG: log every line that contains a bracket change marker
-  cleaned.split('\n').forEach((line, i) => {
-    if (/^\[.?\]/.test(line.trim())) {
-      console.error(`[DEBUG line ${i}]: ${JSON.stringify(line.trim())}`);
-    }
-  });
-  const lines = cleaned.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n'); const stacks: StackDiff[] = [];
-
+  const lines = stripAnsi(raw).replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const stacks: StackDiff[] = [];
   let current: StackDiff | null = null;
   let inResources = false;
 
   for (const line of lines) {
-    const trimmed = line.trim();
+    const t = line.trim();
 
-    // New stack block
-    const stackMatch = trimmed.match(/^Stack\s+(.+)$/);
+    const stackMatch = t.match(/^Stack\s+(.+)$/);
     if (stackMatch) {
-      current = {
-        stackName: stackMatch[1].trim(),
-        resources: [],
-        hasIamChanges: false,
-        hasSecurityGroupChanges: false,
-        noChanges: false,
-        costImpact: { addedCost: 0, removedCost: 0, netCost: 0, knownResources: 0, unknownResources: 0, liveResources: 0 },
-      };
+      current = { stackName: stackMatch[1].trim(), resources: [], hasIamChanges: false, hasSecurityGroupChanges: false, noChanges: false, costImpact: { ...ZERO_IMPACT } };
       stacks.push(current);
       inResources = false;
       continue;
     }
 
     if (!current) continue;
-
-    if (/There were no differences/.test(trimmed)) {
-      current.noChanges = true;
-      continue;
-    }
-
-    // IAM / Security section headers — flag the stack but stop resource parsing
-    if (/IAM Statement Changes|IAM Policy Changes/i.test(trimmed)) {
-      current.hasIamChanges = true;
-      inResources = false;
-      continue;
-    }
-
-    if (/Security Group Changes/i.test(trimmed)) {
-      current.hasSecurityGroupChanges = true;
-      inResources = false;
-      continue;
-    }
-
-    // Resources section — start parsing
-    if (/^Resources$/i.test(trimmed)) {
-      inResources = true;
-      continue;
-    }
-
-    // Any other top-level section — stop parsing resources
-    if (/^(Parameters|Outputs|Other Changes|Conditions)$/i.test(trimmed)) {
-      inResources = false;
-      continue;
-    }
-
+    if (/There were no differences/.test(t)) { current.noChanges = true; continue; }
+    if (/IAM Statement Changes|IAM Policy Changes/i.test(t)) { current.hasIamChanges = true; inResources = false; continue; }
+    if (/Security Group Changes/i.test(t)) { current.hasSecurityGroupChanges = true; inResources = false; continue; }
+    if (/^Resources$/i.test(t)) { inResources = true; continue; }
+    if (/^(Parameters|Outputs|Other Changes|Conditions)$/i.test(t)) { inResources = false; continue; }
     if (!inResources) continue;
 
-    // Resource line: [+] AWS::S3::Bucket LogicalId PhysicalId
-    const resMatch = trimmed.match(/^\[([+~!\-])\]\s+(\S+)\s+(.+)$/);
-    if (resMatch) {
-      const sym = resMatch[1];
-      const changeType = CHANGE_SYMBOLS[sym] ?? 'modify';
-      const awsType = resMatch[2];
-      const rest = resMatch[3].trim().split(/\s+/);
-      const logicalId = rest[0];
-      const physicalId = rest.slice(1).join(' ') || undefined;
-
+    const m = t.match(/^\[([+~!\-])\]\s+(\S+)\s+(.+)$/);
+    if (m) {
+      const rest = m[3].trim().split(/\s+/);
       current.resources.push({
-        changeType,
-        awsType,
-        logicalId,
-        physicalId,
-        raw: trimmed,
-        estimatedCost: estimateResourceCost(awsType),
+        changeType: CHANGE_SYMBOLS[m[1]] ?? 'modify',
+        awsType: m[2],
+        logicalId: rest[0],
+        physicalId: rest.slice(1).join(' ') || undefined,
+        raw: t,
+        estimatedCost: estimateResourceCost(m[2]),
       });
     }
   }
 
-  // Calculate per-stack cost impact
-  for (const stack of stacks) {
-    stack.costImpact = calculateCostImpact(stack.resources);
-  }
-
-  const allResources = stacks.flatMap((s) => s.resources);
-  const totalCostImpact = calculateCostImpact(allResources);
+  for (const s of stacks) s.costImpact = calculateCostImpact(s.resources);
+  const all = stacks.flatMap((s) => s.resources);
 
   return {
     stacks,
-    totalAdded: allResources.filter((r) => r.changeType === 'add').length,
-    totalModified: allResources.filter((r) => r.changeType === 'modify').length,
-    totalRemoved: allResources.filter((r) => r.changeType === 'remove').length,
+    totalAdded: all.filter((r) => r.changeType === 'add').length,
+    totalModified: all.filter((r) => r.changeType === 'modify').length,
+    totalRemoved: all.filter((r) => r.changeType === 'remove').length,
     hasSecurityChanges: stacks.some((s) => s.hasIamChanges || s.hasSecurityGroupChanges),
-    costImpact: totalCostImpact,
+    costImpact: calculateCostImpact(all),
   };
 }

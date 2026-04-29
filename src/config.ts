@@ -1,3 +1,8 @@
+/**
+ * RC file loader — reads .cdkdiffreportrc / .cdkdiffreportrc.json from the project root.
+ * @module config
+ */
+
 import fs from 'fs';
 import path from 'path';
 
@@ -12,26 +17,16 @@ export interface Config {
   htmlOutput?: string;
 }
 
-const DEFAULTS: Config = {
-  cdkArgs: ['--all'],
-  platform: 'bitbucket',
-  bitbucketApiUrl: 'https://api.bitbucket.org/2.0',
-  dryRun: false,
-};
-
+const DEFAULTS: Config = { cdkArgs: ['--all'], platform: 'bitbucket', bitbucketApiUrl: 'https://api.bitbucket.org/2.0', dryRun: false };
 const RC_FILENAMES = ['.cdkdiffreportrc', '.cdkdiffreportrc.json'];
 
+/** Load configuration from .cdkdiffreportrc in the given directory. */
 export function loadConfig(cwd = process.cwd()): Config {
-  for (const filename of RC_FILENAMES) {
-    const filePath = path.join(cwd, filename);
-    if (fs.existsSync(filePath)) {
-      try {
-        const raw = fs.readFileSync(filePath, 'utf-8');
-        const userConfig = JSON.parse(raw) as Partial<Config>;
-        return { ...DEFAULTS, ...userConfig };
-      } catch (err) {
-        throw new Error(`Failed to parse ${filename}: ${(err as Error).message}`);
-      }
+  for (const f of RC_FILENAMES) {
+    const p = path.join(cwd, f);
+    if (fs.existsSync(p)) {
+      try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(p, 'utf-8')) as Partial<Config> }; }
+      catch (e) { throw new Error(`Failed to parse ${f}: ${(e as Error).message}`); }
     }
   }
   return { ...DEFAULTS };

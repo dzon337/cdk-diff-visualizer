@@ -1,8 +1,9 @@
 src/
-*.map
-tsconfig.json
-.cdkdiffreportrc.example
-*.tar.gz
-.env*
-coverage/
+test-cdk-app/
 dist/test/
+.github/
+.gitlab-ci.yml
+tsconfig.json
+.cdkdiffreportrc*
+*.ts
+!dist/**/*.d.ts

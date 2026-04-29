@@ -1,12 +1,20 @@
 {
   "name": "cdk-diff-report",
   "version": "1.0.0",
-  "description": "Run cdk diff, stream output to console, and post/update a summary comment on your Bitbucket, GitHub, or GitLab PR/MR",
+  "description": "Run cdk diff, stream output, and post/update a formatted cost-aware summary comment on Bitbucket, GitHub, or GitLab PRs/MRs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
     "cdk-diff-report": "dist/cli.js"
   },
+  "files": [
+    "dist/**/*.js",
+    "dist/**/*.d.ts",
+    "dist/**/*.js.map",
+    "dist/**/*.d.ts.map",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",
     "dev": "ts-node src/cli.ts",
@@ -16,19 +24,27 @@
   "keywords": [
     "cdk",
     "diff",
+    "cost",
+    "pricing",
     "bitbucket",
     "github",
     "gitlab",
     "pull-request",
     "merge-request",
     "aws",
-    "devops"
+    "cloudformation",
+    "devops",
+    "infrastructure"
   ],
   "author": "",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dzon337/cdk-diff-visualizer.git"
+  },
+  "homepage": "https://github.com/dzon337/cdk-diff-visualizer#readme",
   "dependencies": {
-    "@aws-sdk/client-pricing": "^3.1038.0",
-    "chalk": "^4.1.2"
+    "@aws-sdk/client-pricing": "^3.1038.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -36,6 +52,6 @@
     "typescript": "^5.0.0"
   },
   "engines": {
-    "node": ">=16"
+    "node": ">=18"
   }
 }
