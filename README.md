@@ -103,16 +103,61 @@ my-cdk-project/
 
 ### Options reference
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `platform` | `string` | `"bitbucket"` | CI platform: `"bitbucket"`, `"github"`, or `"gitlab"` |
-| `cdkArgs` | `string[]` | `["--all"]` | Arguments forwarded to `cdk diff` |
-| `htmlOutput` | `string` | — | Path to write a standalone HTML report |
-| `dryRun` | `boolean` | `false` | Skip posting, print markdown preview instead |
-| `bitbucketApiUrl` | `string` | `https://api.bitbucket.org/2.0` | Override for Bitbucket Server |
-| `gitlabApiUrl` | `string` | auto-detected | Override for self-managed GitLab |
-| `workspace` | `string` | `$BITBUCKET_WORKSPACE` | Override Bitbucket workspace slug |
-| `repoSlug` | `string` | `$BITBUCKET_REPO_SLUG` | Override Bitbucket repo slug |
+| Field | RC file key | Env var override | Default |
+|-------|------------|------------------|---------|
+| Platform | `platform` | `CDK_DIFF_PLATFORM` | `"bitbucket"` |
+| CDK args | `cdkArgs` | `CDK_DIFF_CDK_ARGS` (comma-separated) | `["--all"]` |
+| HTML report | `htmlOutput` | `CDK_DIFF_HTML_OUTPUT` | — |
+| Dry run | `dryRun` | `CDK_DIFF_DRY_RUN` (`true`/`false`) | `false` |
+| BB API URL | `bitbucketApiUrl` | `CDK_DIFF_BITBUCKET_API_URL` | `https://api.bitbucket.org/2.0` |
+| GL API URL | `gitlabApiUrl` | `CDK_DIFF_GITLAB_API_URL` | auto-detected |
+| BB workspace | `workspace` | `CDK_DIFF_WORKSPACE` | `$BITBUCKET_WORKSPACE` |
+| BB repo slug | `repoSlug` | `CDK_DIFF_REPO_SLUG` | `$BITBUCKET_REPO_SLUG` |
+
+**Priority:** `CDK_DIFF_*` env vars → `.cdkdiffreportrc` file → built-in defaults.
+
+### Multi-repo / Cross-repo setup
+
+If your **buildspec lives in a different repo** than your CDK app, you have two options:
+
+#### Option A: Use `--cwd` to point to the CDK project
+
+```yaml
+# buildspec.yml (in your CI/CD repo)
+phases:
+  build:
+    commands:
+      - git clone https://bitbucket.org/my-team/my-cdk-app.git /tmp/cdk-app
+      - cd /tmp/cdk-app && npm ci
+      - cdk-diff-report --cwd /tmp/cdk-app
+```
+
+The tool reads `.cdkdiffreportrc` and runs `cdk diff` from the `--cwd` directory.
+
+#### Option B: Use environment variables (no config file needed)
+
+Set everything via `CDK_DIFF_*` env vars in your buildspec — no need to put a
+`.cdkdiffreportrc` in the CDK repo at all:
+
+```yaml
+# buildspec.yml
+env:
+  variables:
+    CDK_DIFF_PLATFORM: "bitbucket"
+    CDK_DIFF_CDK_ARGS: "--all"
+    CDK_DIFF_HTML_OUTPUT: "cdk-diff.html"
+    BITBUCKET_WORKSPACE: "my-team"
+    BITBUCKET_REPO_SLUG: "my-cdk-app"
+  secrets-manager:
+    BITBUCKET_ACCESS_TOKEN: "bitbucket/access-token"
+
+phases:
+  build:
+    commands:
+      - export BITBUCKET_PR_ID=$(echo $CODEBUILD_WEBHOOK_TRIGGER | grep -oP '\d+')
+      - cd /path/to/cdk-app && npm ci
+      - cdk-diff-report
+```
 
 ---
 
