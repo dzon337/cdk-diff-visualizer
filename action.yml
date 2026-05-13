@@ -1,0 +1,51 @@
+name: 'CDK Diff Report'
+description: 'Run cdk diff and post a formatted, cost-aware summary comment to your GitHub PR automatically.'
+author: 'dzon337'
+
+branding:
+  icon: 'git-pull-request'
+  color: 'orange'
+
+inputs:
+  cdk-args:
+    description: 'Arguments forwarded to cdk diff (comma-separated). Example: "--all" or "MyStack,OtherStack"'
+    required: false
+    default: '--all'
+  html-output:
+    description: 'Path to write a standalone HTML report (relative to working-directory). Leave empty to skip.'
+    required: false
+    default: ''
+  dry-run:
+    description: 'If "true", preview the markdown in the log without posting to the PR.'
+    required: false
+    default: 'false'
+  working-directory:
+    description: 'Directory containing cdk.json. Defaults to the repository root.'
+    required: false
+    default: '.'
+  node-version:
+    description: 'Node.js version to use. Must be >= 18.'
+    required: false
+    default: '20'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Install cdk-diff-report
+      shell: bash
+      run: npm install -g cdk-diff-report@latest
+
+    - name: Run CDK Diff Report
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CDK_DIFF_PLATFORM: github
+        CDK_DIFF_CDK_ARGS: ${{ inputs.cdk-args }}
+        CDK_DIFF_HTML_OUTPUT: ${{ inputs.html-output }}
+        CDK_DIFF_DRY_RUN: ${{ inputs.dry-run }}
+      run: cdk-diff-report

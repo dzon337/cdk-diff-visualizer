@@ -38,11 +38,9 @@ const CHANGE_SYMBOLS: Record<string, ChangeType> = { '+': 'add', '~': 'modify', 
 const ZERO_IMPACT: CostImpact = { addedCost: 0, removedCost: 0, netCost: 0, knownResources: 0, unknownResources: 0, liveResources: 0 };
 
 function stripAnsi(s: string): string {
-  // eslint-disable-next-line no-control-regex
   return s.replace(/\x1B\[[0-9;]*[a-zA-Z]/g, '');
 }
 
-/** Parse raw `cdk diff` output into structured diff data with cost estimates. */
 export function parseCdkDiff(raw: string): ParsedDiff {
   const lines = stripAnsi(raw).replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
   const stacks: StackDiff[] = [];

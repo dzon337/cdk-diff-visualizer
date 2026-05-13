@@ -17,7 +17,6 @@ export interface TemplateResources {
   resources: Map<string, ResourceProperties>;
 }
 
-/** Read all *.template.json files from cdk.out/ and extract resource definitions. */
 export function readTemplates(cwd: string): TemplateResources {
   const resources = new Map<string, ResourceProperties>();
   const cdkOutDir = path.join(cwd, 'cdk.out');
@@ -32,7 +31,9 @@ export function readTemplates(cwd: string): TemplateResources {
       for (const [id, res] of Object.entries(template.Resources)) {
         resources.set(id, { logicalId: id, type: res.Type, properties: res.Properties ?? {} });
       }
-    } catch { /* skip malformed templates */ }
+    } catch (error) {
+      console.error(`Failed to read template from ${file}:`, error);
+    }
   }
   return { resources };
 }

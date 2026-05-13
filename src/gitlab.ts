@@ -67,7 +67,6 @@ export async function deleteMrNote(env: GitLabEnv, id: number): Promise<void> {
   if (!r.ok) throw new Error(`GitLab API ${r.status}: ${await r.text()}`);
 }
 
-/** Upsert an MR note — update existing or create new. */
 export async function upsertMrNote(env: GitLabEnv, md: string): Promise<void> {
   const marked = withMarker(md);
   const existing = await findExistingNote(env);

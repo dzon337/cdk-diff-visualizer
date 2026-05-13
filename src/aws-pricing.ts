@@ -42,7 +42,6 @@ function toMonthly(hourly: number | null): number | null {
   return hourly && hourly > 0 ? Math.round(hourly * 730 * 100) / 100 : null;
 }
 
-/** Fetch monthly on-demand price for an EC2 instance type. */
 export async function getEc2Price(instanceType: string, region = 'us-east-1'): Promise<{ monthlyCost: number; note: string } | null> {
   const m = toMonthly(await fetchOnDemandPrice('AmazonEC2', [
     { Type: 'TERM_MATCH', Field: 'instanceType', Value: instanceType },
@@ -55,7 +54,6 @@ export async function getEc2Price(instanceType: string, region = 'us-east-1'): P
   return m ? { monthlyCost: m, note: `${instanceType} on-demand (${region})` } : null;
 }
 
-/** Fetch monthly on-demand price for an RDS DB instance. */
 export async function getRdsPrice(dbInstanceClass: string, engine: string, region = 'us-east-1'): Promise<{ monthlyCost: number; note: string } | null> {
   const engineMap: Record<string, string> = {
     mysql: 'MySQL', postgres: 'PostgreSQL', mariadb: 'MariaDB',
@@ -72,7 +70,6 @@ export async function getRdsPrice(dbInstanceClass: string, engine: string, regio
   return m ? { monthlyCost: m, note: `${dbInstanceClass} ${engine} Single-AZ (${region})` } : null;
 }
 
-/** Fetch monthly on-demand price for an ElastiCache node. */
 export async function getElastiCachePrice(nodeType: string, engine = 'Redis', region = 'us-east-1'): Promise<{ monthlyCost: number; note: string } | null> {
   const m = toMonthly(await fetchOnDemandPrice('AmazonElastiCache', [
     { Type: 'TERM_MATCH', Field: 'instanceType', Value: nodeType },
@@ -82,7 +79,6 @@ export async function getElastiCachePrice(nodeType: string, engine = 'Redis', re
   return m ? { monthlyCost: m, note: `${nodeType} ${engine} (${region})` } : null;
 }
 
-/** Fetch monthly NAT Gateway price (hourly rate only, excludes data). */
 export async function getNatGatewayPrice(region = 'us-east-1'): Promise<{ monthlyCost: number; note: string } | null> {
   const m = toMonthly(await fetchOnDemandPrice('AmazonEC2', [
     { Type: 'TERM_MATCH', Field: 'location', Value: regionToLocation(region) },
@@ -91,7 +87,6 @@ export async function getNatGatewayPrice(region = 'us-east-1'): Promise<{ monthl
   return m ? { monthlyCost: m, note: `NAT Gateway (${region}) + data transfer` } : null;
 }
 
-/** Clear the in-memory price cache. */
 export function clearPriceCache(): void { priceCache.clear(); }
 
 const REGION_LOCATION: Record<string, string> = {
