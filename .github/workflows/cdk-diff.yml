@@ -12,24 +12,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GH_TOKEN }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Build cdk-diff-report package
-        run: |
-          npm install
-          npm run build
-
-      - name: Install cdk-diff-report globally
-        run: npm install -g .
-      
-      - name: Install AWS CDK
-        run: npm install -g aws-cdk
-        
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -37,12 +20,16 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: eu-central-1
 
+      - name: Install AWS CDK
+        run: npm install -g aws-cdk
+
       - name: Install test app dependencies
         run: npm install
         working-directory: test-cdk-app
 
-      - name: Run CDK Diff
-        run: cdk-diff-report
-        working-directory: test-cdk-app
+      - name: Run CDK Diff Report
+        uses: dzon337/cdk-diff-visualizer@v1.1.0
+        with:
+          working-directory: test-cdk-app
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
