@@ -3,7 +3,7 @@
 > Run `cdk diff` and get a beautifully formatted cost-aware summary posted to your Bitbucket, GitHub, or GitLab PR/MR — automatically.
 
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-CDK%20Diff%20Report-blue?logo=github)](https://github.com/marketplace/actions/cdk-diff-report)
-![npm](https://img.shields.io/npm/v/cdk-diff-report)
+![npm]([https://img.shields.io/npm/v/cdk-diff-report](https://www.npmjs.com/package/cdk-diff-report))
 ![node](https://img.shields.io/node/v/cdk-diff-report)
 ![license](https://img.shields.io/npm/l/cdk-diff-report)
 
