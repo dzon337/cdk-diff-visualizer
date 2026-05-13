@@ -3,36 +3,52 @@ import { run } from './runner';
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run') || args.includes('--dry');
+const cwdIdx = args.indexOf('--cwd');
+const cwd = cwdIdx !== -1 && args[cwdIdx + 1] ? args[cwdIdx + 1] : undefined;
 
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`
-cdk-diff-report
-
-Runs \`cdk diff\` (using args from .cdkdiffreportrc), streams output to the
-console, then posts a formatted summary comment to the Bitbucket pull request.
+cdk-diff-report — Run cdk diff and post a cost-aware summary to your PR/MR.
 
 Usage:
-  cdk-diff-report              Run diff and post PR comment
-  cdk-diff-report --dry-run    Run diff, print markdown preview, skip posting
-  cdk-diff-report --help       Show this help
+  cdk-diff-report                      Run diff and post/update PR comment
+  cdk-diff-report --dry-run            Preview markdown, skip posting
+  cdk-diff-report --cwd /path/to/cdk   Run in a different CDK project directory
+  cdk-diff-report --help               Show this help
 
-Configuration (.cdkdiffreportrc in project root):
+Configuration (in order of priority):
+  1. CDK_DIFF_* environment variables   (highest — great for CI/CD)
+  2. .cdkdiffreportrc file              (in the CDK project root, next to cdk.json)
+  3. Built-in defaults                  (lowest)
+
+  RC file example:
   {
-    "cdkArgs": ["--all"],           // args forwarded to cdk diff
-    "htmlOutput": "cdk-diff.html",  // optional: write HTML report to file
-    "dryRun": false                 // optional: never post, just preview
+    "platform": "github",
+    "cdkArgs": ["--all"],
+    "htmlOutput": "cdk-diff.html",
+    "dryRun": false
   }
 
-Required environment variables (set automatically by Bitbucket Pipelines):
-  BITBUCKET_PR_ID
-  BITBUCKET_WORKSPACE
-  BITBUCKET_REPO_SLUG
-  BITBUCKET_ACCESS_TOKEN          // create a repository access token in Bitbucket
+  Environment variable overrides:
+    CDK_DIFF_PLATFORM=github           "bitbucket" | "github" | "gitlab"
+    CDK_DIFF_CDK_ARGS=--all,MyStack    comma-separated args for cdk diff
+    CDK_DIFF_HTML_OUTPUT=report.html   write HTML report
+    CDK_DIFF_DRY_RUN=true              skip posting
+
+  Platform tokens:
+    GitHub:    GITHUB_TOKEN
+    GitLab:    GITLAB_TOKEN
+    Bitbucket: BITBUCKET_ACCESS_TOKEN, BITBUCKET_PR_ID, BITBUCKET_WORKSPACE, BITBUCKET_REPO_SLUG
+
+  AWS (for cdk diff + live cost pricing):
+    AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
+
+Docs: https://github.com/dzon337/cdk-diff-visualizer#readme
 `);
   process.exit(0);
 }
 
-run({ dryRun }).catch((err: Error) => {
+run({ dryRun, cwd }).catch((err: Error) => {
   console.error(`\n❌  cdk-diff-report failed: ${err.message}\n`);
   process.exit(1);
 });

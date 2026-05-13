@@ -7,10 +7,13 @@ jobs:
   cdk-diff:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: write
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
@@ -20,12 +23,13 @@ jobs:
         run: |
           npm install
           npm run build
-        working-directory: .   # repo root = cdk-diff-report/
 
       - name: Install cdk-diff-report globally
         run: npm install -g .
-        working-directory: .
-
+      
+      - name: Install AWS CDK
+        run: npm install -g aws-cdk
+        
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -41,4 +45,4 @@ jobs:
         run: cdk-diff-report
         working-directory: test-cdk-app
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}

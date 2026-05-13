@@ -1,5 +1,5 @@
 {
-  "cdkArgs": ["--all --ci"],
-  "dryRun": true,
+  "platform": "github",
+  "cdkArgs": ["--all"],
   "htmlOutput": "cdk-diff.html"
 }

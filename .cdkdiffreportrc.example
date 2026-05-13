@@ -1,4 +1,5 @@
 {
+  "platform": "github",
   "cdkArgs": ["--all"],
   "htmlOutput": "cdk-diff.html",
   "dryRun": false
