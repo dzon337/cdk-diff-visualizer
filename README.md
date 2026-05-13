@@ -3,7 +3,7 @@
 > Run `cdk diff` and get a beautifully formatted cost-aware summary posted to your Bitbucket, GitHub, or GitLab PR/MR — automatically.
 
 [![GitHub Marketplace](https://img.shields.io/badge/Marketplace-CDK%20Diff%20Report-blue?logo=github)](https://github.com/marketplace/actions/cdk-diff-report)
-![npm]([https://img.shields.io/npm/v/cdk-diff-report](https://www.npmjs.com/package/cdk-diff-report))
+![npm](https://img.shields.io/npm/v/cdk-diff-report)
 ![node](https://img.shields.io/node/v/cdk-diff-report)
 ![license](https://img.shields.io/npm/l/cdk-diff-report)
 
@@ -14,6 +14,9 @@
 3. **Estimates monthly cost impact** for each resource (live AWS Pricing API + static fallback)
 4. Posts a formatted Markdown comment to your PR/MR
 5. On subsequent runs, **updates the same comment** instead of creating duplicates
+
+### NPM Package available:
+https://www.npmjs.com/package/cdk-diff-report
 
 ## Quick Start — GitHub Action (recommended)
 
