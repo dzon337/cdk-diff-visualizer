@@ -62,7 +62,6 @@ export async function updateGitHubPrComment(env: GitHubEnv, id: number, md: stri
   if (!r.ok) throw new Error(`GitHub API ${r.status}: ${await r.text()}`);
 }
 
-/** Upsert a PR comment — update existing or create new. */
 export async function upsertGitHubPrComment(env: GitHubEnv, md: string): Promise<void> {
   const marked = withMarker(md);
   const existing = await findExistingComment(env);

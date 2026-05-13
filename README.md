@@ -2,6 +2,7 @@
 
 > Run `cdk diff` and get a beautifully formatted cost-aware summary posted to your Bitbucket, GitHub, or GitLab PR/MR — automatically.
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-CDK%20Diff%20Report-blue?logo=github)](https://github.com/marketplace/actions/cdk-diff-report)
 ![npm](https://img.shields.io/npm/v/cdk-diff-report)
 ![node](https://img.shields.io/node/v/cdk-diff-report)
 ![license](https://img.shields.io/npm/l/cdk-diff-report)
@@ -14,7 +15,47 @@
 4. Posts a formatted Markdown comment to your PR/MR
 5. On subsequent runs, **updates the same comment** instead of creating duplicates
 
-## Quick Start
+## Quick Start — GitHub Action (recommended)
+
+The fastest way to get started on GitHub:
+
+```yaml
+# .github/workflows/cdk-diff.yml
+name: CDK Diff
+on: pull_request
+
+jobs:
+  cdk-diff:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci                         # install your CDK app deps
+      - uses: dzon337/cdk-diff-visualizer@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: eu-central-1
+```
+
+That's it — every PR gets a cost-aware diff comment automatically.
+
+### Action Inputs
+
+| Input | Description | Default |
+|-------|-------------|---------|
+| `cdk-args` | Arguments forwarded to `cdk diff` (comma-separated) | `--all` |
+| `html-output` | Path to write an HTML report | — |
+| `dry-run` | Preview markdown without posting | `false` |
+| `working-directory` | Directory containing `cdk.json` | `.` |
+| `node-version` | Node.js version to use | `20` |
+
+---
+
+## Quick Start — npm CLI
 
 ### 1. Install
 
@@ -190,6 +231,8 @@ The cost column appears in both the PR comment and the HTML report:
 
 ### GitHub Actions
 
+#### Using the Marketplace Action (recommended)
+
 ```yaml
 # .github/workflows/cdk-diff.yml
 name: CDK Diff
@@ -203,16 +246,33 @@ jobs:
       pull-requests: write
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
       - run: npm ci
-      - run: npx cdk-diff-report
+      - uses: dzon337/cdk-diff-visualizer@v1
+        with:
+          cdk-args: '--all'
+          html-output: 'cdk-diff.html'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: eu-central-1
+```
+
+#### Using npx directly
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-node@v4
+    with:
+      node-version: '20'
+  - run: npm ci
+  - run: npx cdk-diff-report
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-central-1
 ```
 
 **Environment variables** (set automatically by GitHub Actions):

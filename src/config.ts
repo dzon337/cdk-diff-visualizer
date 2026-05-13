@@ -21,7 +21,6 @@ export interface Config {
 const DEFAULTS: Config = { cdkArgs: ['--all'], platform: 'bitbucket', bitbucketApiUrl: 'https://api.bitbucket.org/2.0', dryRun: false };
 const RC_FILENAMES = ['.cdkdiffreportrc', '.cdkdiffreportrc.json'];
 
-/** Load configuration: defaults ← .cdkdiffreportrc ← CDK_DIFF_* env vars. */
 export function loadConfig(cwd = process.cwd()): Config {
   let config = { ...DEFAULTS };
 

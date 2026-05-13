@@ -239,14 +239,12 @@ export function generateMarkdownComment(diff: ParsedDiff, prUrl?: string, htmlRe
     lines.push('');
   }
 
-  // Summary table
   lines.push('| ✅ Added | ⚠️ Modified | ❌ Removed | 🔐 IAM stacks | 💰 Est. cost |');
   lines.push('|---------|------------|-----------|--------------|-------------|');
   const iamCount = diff.stacks.filter((s) => s.hasIamChanges || s.hasSecurityGroupChanges).length;
   lines.push(`| ${diff.totalAdded} | ${diff.totalModified} | ${diff.totalRemoved} | ${iamCount} | ${formatCostWithSign(diff.costImpact.netCost)}/mo |`);
   lines.push('');
 
-  // Per-stack breakdown
   for (const stack of diff.stacks) {
     const added = stack.resources.filter((r) => r.changeType === 'add').length;
     const modified = stack.resources.filter((r) => r.changeType === 'modify').length;
